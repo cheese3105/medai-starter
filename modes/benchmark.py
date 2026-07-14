@@ -64,9 +64,12 @@ def run_benchmark(config_path: str, split: str = "test", limit: int | None = Non
 
     app = build_graph(run_config)
 
-    pred_path = Path(f"predictions_{run_config.variant}_{split}.jsonl")
-    gold_path = Path(f"gold_{split}.jsonl")
-    config_out_path = Path(f"run_config_{run_config.variant}_{split}.json")
+    output_dir = Path("output")
+    output_dir.mkdir(exist_ok=True)
+
+    pred_path = output_dir / f"predictions_{run_config.variant}_{split}.jsonl"
+    gold_path = output_dir / f"gold_{split}.jsonl"
+    config_out_path = output_dir / f"run_config_{run_config.variant}_{split}.json"
     gold_already_exists = gold_path.exists()
 
     # run_config lưu 1 lần/file riêng (không lặp lại ở từng dòng jsonl)

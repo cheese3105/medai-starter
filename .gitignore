@@ -26,9 +26,8 @@ Archive.zip
 .DS_Store
 
 # Output files (re-generated on each run — no need to track)
-predictions_*.jsonl
-gold_*.jsonl
-run_config_*.json
+output/*
+!output/.gitkeep
 
 # IDE
 .vscode/

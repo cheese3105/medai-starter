@@ -93,13 +93,13 @@ python main.py --mode chat
 
 ## 📂 Output sau khi chạy Benchmark
 
-Mỗi lần chạy benchmark tự động tạo ra 3 file:
+Mỗi lần chạy benchmark tự động tạo ra 3 file trong thư mục `output/`:
 
 | File | Nội dung |
 |---|---|
-| `predictions_{variant}_{split}.jsonl` | Dự đoán của model: `question_id`, `question`, `choices`, `predicted_answer` (A/B/C/D hoặc INVALID), `explanation`, `confidence`, `latency_ms`, `token_usage`, v.v. |
-| `gold_{split}.jsonl` | Đáp án đúng: `question_id` + `gold_answer` — **tách riêng**, không đưa vào pipeline |
-| `run_config_{variant}_{split}.json` | Toàn bộ config đã dùng cho lần chạy này (model, prompt, temperature...) |
+| `output/predictions_{variant}_{split}.jsonl` | Dự đoán của model: `question_id`, `question`, `choices`, `predicted_answer` (A/B/C/D hoặc INVALID), `explanation`, `confidence`, `latency_ms`, `token_usage`, v.v. |
+| `output/gold_{split}.jsonl` | Đáp án đúng: `question_id` + `gold_answer` — **tách riêng**, không đưa vào pipeline |
+| `output/run_config_{variant}_{split}.json` | Toàn bộ config đã dùng cho lần chạy này (model, prompt, temperature...) |
 
 Ví dụ 1 dòng trong `predictions_v0_train.jsonl`:
 ```json
