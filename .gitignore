@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+*.so
+
+# Virtual environment
+venv/
+env/
+.env/
+
+# Secrets & environment variables
+.env
+
+# Large files
+Archive.zip
+*.zip
+
+# macOS
+.DS_Store
+
+# Output files (re-generated on each run — no need to track)
+predictions_*.jsonl
+gold_*.jsonl
+run_config_*.json
+
+# IDE
+.vscode/
+.idea/
