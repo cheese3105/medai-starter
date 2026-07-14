@@ -58,7 +58,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # 3. Cấu hình API key
-cp .env.example .env
+cp env-example .env
 # Mở file .env và điền thông tin thật vào
 ```
 
