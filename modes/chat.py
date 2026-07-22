@@ -20,9 +20,15 @@ CHAT_SYSTEM_PROMPT = (
 )
 
 
-def run_chat() -> None:
-    llm = build_llm(temperature=0.3)
-    print("=== Med-AI Chat === (nhập 'exit' để thoát)")
+def run_chat(config_path: str) -> None:
+    from run_config import load_run_config
+
+    run_config = load_run_config(config_path)
+    llm = build_llm(
+        model=run_config.model,
+        temperature=run_config.temperature,
+    )
+    print(f"=== Med-AI Chat === ({run_config.model} - nhập 'exit' để thoát)")
 
     while True:
         question = input("\nCâu hỏi: ").strip()

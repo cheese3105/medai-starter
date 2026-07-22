@@ -45,9 +45,10 @@ def main():
         run_benchmark(config_path=args.config, split=args.split, limit=args.limit)
 
     elif args.mode == "chat":
+        config_path = args.config or "configs/v0.yaml"
         from modes.chat import run_chat
 
-        run_chat()
+        run_chat(config_path=config_path)
 
 
 if __name__ == "__main__":

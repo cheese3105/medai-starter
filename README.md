@@ -66,8 +66,10 @@ cp env-example .env
 ```
 NINE_ROUTER_BASE_URL=http://...   # URL endpoint LLM
 NINE_ROUTER_API_KEY=...           # API key
-LLM_MODEL=gemini-flash-latest     # Model mặc định cho Mode chat
 ```
+
+Phần cấu hình loại/tên model nằm trong file configs/v0.yaml. 
+VD: model: "gemini-3.5-flash-lite"
 
 ---
 
@@ -85,8 +87,14 @@ python main.py --mode benchmark --config configs/v0.yaml --split test
 
 ### Mode 2 — Chat (hỏi đáp tự do)
 
+Mặc định sử dụng cấu hình từ `configs/v0.yaml`. Bạn cũng có thể chỉ định file cấu hình khác qua tham số `--config`.
+
 ```bash
+# Chạy với cấu hình mặc định (configs/v0.yaml)
 python main.py --mode chat
+
+# Chạy với cấu hình tùy chỉnh (ví dụ configs/v1.yaml)
+python main.py --mode chat --config configs/v1.yaml
 ```
 
 ---
