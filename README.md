@@ -108,13 +108,15 @@ EMBEDDING_MODEL_API_KEY=your_embedding_api_key          # API key dùng để g�
 
 Nếu bạn đã có sẵn thư mục chứa cơ sở dữ liệu ChromaDB tại `data/chroma/...` (ví dụ: được giải nén từ file zip dữ liệu đã xây dựng sẵn), bạn có thể bỏ qua bước này.
 
+Cơ sở dữ liệu ChromaDB đã được ingest sẵn: https://drive.google.com/file/d/1pIQYQ7CHJPbWqNW07kff5XA3YS8ER_Bb/view?usp=sharing
+
 Nếu muốn xây dựng cơ sở dữ liệu từ đầu từ tài liệu thô:
 1. Chuẩn bị file dữ liệu giáo trình tại `data/corpus/medrag_textbooks/textbooks.jsonl`.
 2. Đảm bảo cấu hình `EMBEDDING_MODEL_API_KEY` đã được thiết lập đúng trong `.env`.
 3. Chạy lệnh xây dựng vector database (quá trình này chạy offline và có thể mất vài giờ tùy thuộc kích thước tài liệu):
 
 ```bash
-python3 -m retrieval.ingest_data
+python3 -m retrieval.ingest_data 
 ```
 
 ---
