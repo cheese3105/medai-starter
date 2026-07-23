@@ -1,143 +1,185 @@
-# Med-AI Starter
+# Med-AI Starter (Phiên bản v1 - Tích hợp RAG)
 
-Đây là repo khởi đầu cho bài toán **trả lời câu hỏi trắc nghiệm y khoa** (Medical QA), sử dụng dataset [MedQA-USMLE-4-options](https://huggingface.co/datasets/GBaker/MedQA-USMLE-4-options).
+Đây là mã nguồn khởi đầu cho bài toán **trả lời câu hỏi trắc nghiệm y khoa** (Medical QA), sử dụng tập dữ liệu [MedQA-USMLE-4-options](https://huggingface.co/datasets/GBaker/MedQA-USMLE-4-options).
+
+Phiên bản hiện tại (v1) đã được tích hợp thêm cơ chế **Retrieval-Augmented Generation (RAG)** để truy xuất kiến thức y khoa từ giáo trình làm bằng chứng (evidence) hỗ trợ quá trình suy luận của mô hình.
 
 ---
 
-## 🧠 Tổng quan luồng xử lý (Phase v0)
+## 🧠 Tổng quan luồng xử lý
 
-Phase hiện tại (v0) là pipeline **đơn giản nhất**:
+Hệ thống hỗ trợ cấu hình linh hoạt hai luồng xử lý chính thông qua file cấu hình YAML:
 
+### 1. Luồng v0 (Baseline - Chỉ suy luận)
 ```
-Input (câu hỏi + 4 đáp án)
-        ↓
-  Reasoning Agent (LLM)
-        ↓
-Output (đáp án A/B/C/D + giải thích + confidence)
+Yêu cầu (câu hỏi + 4 lựa chọn)
+         ↓
+   Reasoning Agent (LLM)
+         ↓
+Kết quả (đáp án A/B/C/D + giải thích + confidence)
 ```
 
-Chưa có RAG (Retrieval), chưa có Verifier — chỉ 1 LLM suy luận thẳng ra đáp án.
+### 2. Luồng v1 (RAG - Truy xuất và suy luận)
+```
+Yêu cầu (câu hỏi + 4 lựa chọn)
+         ↓
+  Retrieval Agent (Truy xuất ChromaDB bằng bge-m3)
+         ↓
+Điền evidence vào prompt template
+         ↓
+   Reasoning Agent (LLM)
+         ↓
+Kết quả (đáp án A/B/C/D + giải thích + confidence)
+```
 
 ---
 
 ## 🗺️ Cấu trúc thư mục
 
 ```
-medai-starter/
-├── main.py                  # Điểm vào chính, chọn chạy mode nào
-├── state.py                 # Định nghĩa schema dữ liệu chảy qua pipeline
-├── run_config.py            # Đọc file YAML config → đối tượng RunConfig
-├── llm_client.py            # Khởi tạo LLM client (dùng chung toàn dự án)
-├── graph.py                 # Kết nối các Agent thành pipeline (LangGraph)
+medai-starter-with-rag/
+├── main.py                  # Điểm khởi chạy chính (chọn chạy benchmark hoặc chat)
+├── state.py                 # Định nghĩa cấu trúc AgentState đi qua LangGraph
+├── run_config.py            # Đọc cấu hình từ file YAML cấu hình chạy (RunConfig)
+├── llm_client.py            # Khởi tạo LLM client OpenAI-compatible
+├── graph.py                 # Định nghĩa và kết nối luồng xử lý (LangGraph)
 │
 ├── agents/
-│   └── reasoning_agent.py   # Agent duy nhất hiện tại: gọi LLM, parse kết quả
+│   ├── reasoning_agent.py   # Agent suy luận: gọi LLM để đưa ra đáp án cuối cùng
+│   └── retrieval_agent.py   # Agent truy xuất: tìm bằng chứng từ vector database
+│
+├── retrieval/
+│   ├── ingest_data.py       # Pipeline lưu trữ dữ liệu giáo trình vào database Chroma
+│   └── retriever.py         # Tìm kiếm bằng chứng tương đồng từ Chroma index
 │
 ├── configs/
-│   └── v0.yaml              # ⭐ File config chính — chỉnh prompt/model tại đây
+│   ├── v0.yaml              # Cấu hình baseline (không bật RAG)
+│   └── v1.yaml              # Cấu hình RAG (bật retrieval, k=5)
 │
-├── modes/
-│   ├── benchmark.py         # Mode 1: chạy hàng loạt, ghi predictions ra file
-│   └── chat.py              # Mode 2: chat tự do 1 câu hỏi / 1 trả lời
-│
-├── predictions_v0_train.jsonl   # Kết quả dự đoán (tự sinh ra khi chạy)
-├── gold_train.jsonl             # Đáp án đúng  (tự sinh ra khi chạy)
-└── run_config_v0_train.json     # Snapshot config đã dùng (tự sinh ra khi chạy)
+├── output/                  # Thư mục lưu kết quả chạy benchmark
+│   ├── predictions_{variant}_{split}.jsonl  # Dự đoán của Agent
+│   ├── gold_{split}.jsonl                    # Đáp án đúng (được tách riêng)
+│   └── run_config_{variant}_{split}.json     # Bản lưu cấu hình của lượt chạy
+└── requirements.txt         # Các thư viện phụ thuộc của dự án
 ```
 
 ---
 
-## ⚙️ Cài đặt
+## ⚙️ Cài đặt & Cấu hình
+
+### 1. Cài đặt môi trường
+
+Chạy các lệnh dưới đây trong terminal (trong môi trường WSL nếu chạy trên Windows):
 
 ```bash
 # 1. Tạo môi trường ảo
 python3 -m venv venv
 source venv/bin/activate
 
-# 2. Cài thư viện
+# 2. Cài đặt các thư viện cần thiết
 pip install -r requirements.txt
+```
 
-# 3. Cấu hình API key
+### 2. Cấu hình file `.env`
+
+Sao chép file cấu hình mẫu và điền thông tin thực tế:
+
+```bash
 cp env-example .env
-# Mở file .env và điền thông tin thật vào
 ```
 
-**Nội dung `.env` cần điền:**
-```
-NINE_ROUTER_BASE_URL=http://...   # URL endpoint LLM
-NINE_ROUTER_API_KEY=...           # API key
-```
+**Nội dung `.env` cần thiết lập:**
 
-Phần cấu hình loại/tên model nằm trong file configs/v0.yaml. 
-VD: model: "gemini-3.5-flash-lite"
+```env
+# Cấu hình mô hình suy luận (Reasoning Model)
+REASONING_MODEL=gemini-3.5-flash-lite                   # Tên mô hình chính sử dụng
+REASONING_MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai  # Endpoint OpenAI-compatible
+REASONING_MODEL_API_KEY=your_reasoning_model_api_key    # API key của mô hình suy luận
 
----
-
-## 🚀 Cách chạy
-
-### Mode 1 — Benchmark (chạy hàng loạt trên dataset)
-
-```bash
-# Debug nhanh: chạy 20 câu đầu của split train
-python main.py --mode benchmark --config configs/v0.yaml --split train --limit 20
-
-# Chạy chính thức: toàn bộ 1273 câu test (chỉ chạy 1 lần khi đã chắc chắn config)
-python main.py --mode benchmark --config configs/v0.yaml --split test
-```
-
-### Mode 2 — Chat (hỏi đáp tự do)
-
-Mặc định sử dụng cấu hình từ `configs/v0.yaml`. Bạn cũng có thể chỉ định file cấu hình khác qua tham số `--config`.
-
-```bash
-# Chạy với cấu hình mặc định (configs/v0.yaml)
-python main.py --mode chat
-
-# Chạy với cấu hình tùy chỉnh (ví dụ configs/v1.yaml)
-python main.py --mode chat --config configs/v1.yaml
+# Cấu hình mô hình nhúng (Embedding Model) - Cần thiết cho RAG
+EMBEDDING_MODEL=baai/bge-m3                             # Tên mô hình nhúng
+EMBEDDING_MODEL_API_BASE=https://openrouter.ai/api/v1   # API base của mô hình nhúng
+EMBEDDING_MODEL_API_KEY=your_embedding_api_key          # API key dùng để gọi API nhúng
 ```
 
 ---
 
-## 📂 Output sau khi chạy Benchmark
+## 💾 Xây dựng Vector Database (ChromaDB)
 
-Mỗi lần chạy benchmark tự động tạo ra 3 file trong thư mục `output/`:
+Nếu bạn đã có sẵn thư mục chứa cơ sở dữ liệu ChromaDB tại `data/chroma/...` (ví dụ: được giải nén từ file zip dữ liệu đã xây dựng sẵn), bạn có thể bỏ qua bước này.
+
+Nếu muốn xây dựng cơ sở dữ liệu từ đầu từ tài liệu thô:
+1. Chuẩn bị file dữ liệu giáo trình tại `data/corpus/medrag_textbooks/textbooks.jsonl`.
+2. Đảm bảo cấu hình `EMBEDDING_MODEL_API_KEY` đã được thiết lập đúng trong `.env`.
+3. Chạy lệnh xây dựng vector database (quá trình này chạy offline và có thể mất vài giờ tùy thuộc kích thước tài liệu):
+
+```bash
+python3 -m retrieval.ingest_data
+```
+
+---
+
+## 🚀 Hướng dẫn chạy chương trình
+
+### Mode 1 — Benchmark (Đánh giá chất lượng hàng loạt)
+
+Benchmark chạy trên dataset MedQA-USMLE-4-options để đánh giá độ chính xác (Accuracy).
+
+```bash
+# Chạy thử nghiệm nhanh: Chạy 20 câu đầu tiên của tập train bằng luồng v0 (Không RAG)
+python3 main.py --mode benchmark --config configs/v0.yaml --split train --limit 20
+
+# Chạy thử nghiệm nhanh bằng luồng v1 (Có RAG)
+python3 main.py --mode benchmark --config configs/v1.yaml --split train --limit 20
+
+# Chạy chính thức: Toàn bộ 1273 câu của tập test (chỉ chạy khi cấu hình đã được khóa)
+python3 main.py --mode benchmark --config configs/v1.yaml --split test
+```
+
+### Mode 2 — Chat (Hỏi đáp tự do)
+
+Chế độ chat trực tiếp trong terminal để tương tác nhanh với mô hình:
+
+```bash
+# Chạy chat với cấu hình mặc định (configs/v0.yaml)
+python3 main.py --mode chat
+
+# Chạy chat với cấu hình bật RAG (configs/v1.yaml)
+python3 main.py --mode chat --config configs/v1.yaml
+```
+
+---
+
+## 📂 Dữ liệu đầu ra (Output)
+
+Mỗi lượt chạy benchmark sẽ tự động tạo ra một thư mục riêng trong thư mục `output/` có định dạng `output/{variant}_{split}_{timestamp}/` chứa 3 file kết quả:
 
 | File | Nội dung |
 |---|---|
-| `output/predictions_{variant}_{split}.jsonl` | Dự đoán của model: `question_id`, `question`, `choices`, `predicted_answer` (A/B/C/D hoặc INVALID), `explanation`, `confidence`, `latency_ms`, `token_usage`, v.v. |
-| `output/gold_{split}.jsonl` | Đáp án đúng: `question_id` + `gold_answer` — **tách riêng**, không đưa vào pipeline |
-| `output/run_config_{variant}_{split}.json` | Toàn bộ config đã dùng cho lần chạy này (model, prompt, temperature...) |
-
-Ví dụ 1 dòng trong `predictions_v0_train.jsonl`:
-```json
-{
-  "question_id": "train_0",
-  "question": "A 23-year-old man presents with...",
-  "choices": ["Option A text", "Option B text", "Option C text", "Option D text"],
-  "predicted_answer": "D",
-  "explanation": "...",
-  "raw_output": "...",
-  "latency_ms": 1234.5,
-  "token_usage": {...},
-  "estimated_cost": null,
-  "retrieved_docs": null,
-  "agent_trace": null
-}
-```
-
-> **Lý do tách `gold` ra riêng:** Đảm bảo model không "nhìn thấy" đáp án đúng trong quá trình dự đoán. File gold chỉ dùng khi chấm điểm (`evaluate.py`).
+| `output/{variant}_{split}_{timestamp}/predictions_{variant}_{split}_{timestamp}.jsonl` | Chứa dự đoán của mô hình: câu hỏi, các lựa chọn, đáp án mô hình chọn (`predicted_answer`), giải thích, độ tin cậy, dữ liệu truy xuất (`retrieved_docs`), và chi phí / thời gian phản hồi. |
+| `output/{variant}_{split}_{timestamp}/gold_{split}_{timestamp}.jsonl` | Đáp án đúng thực tế của bộ câu hỏi. Được lưu riêng để làm cơ sở tính điểm mà không bị rò rỉ vào luồng suy luận. |
+| `output/{variant}_{split}_{timestamp}/run_config_{variant}_{split}_{timestamp}.jsonl` | Bản lưu snapshot cấu hình đầy đủ của lượt chạy (model, prompt template, temperature...) dưới dạng một dòng JSON. |
 
 ---
 
-## ✏️ Cách chỉnh sửa Prompt
+## ✏️ Cách chỉnh sửa Prompt và Cấu hình Thử nghiệm
 
-Toàn bộ prompt nằm trong file `configs/v0.yaml`, **không cần sửa code Python**:
+Bạn có thể thay đổi prompt trực tiếp trong các file cấu hình YAML tại thư mục `configs/` mà không cần sửa đổi mã nguồn Python:
 
 ```yaml
-# configs/v0.yaml
+# configs/v1.yaml
+variant: "v1"
+prompt_version: "v1_rag"
+temperature: 0.0
+seed: null
+
 prompt_template: |
-  Answer this question:
+  Use the retrieved evidence below if it is relevant to the question.
+  If the evidence is irrelevant or conflicting, ignore it and answer from
+  your own medical knowledge instead.
+
+  Retrieved evidence:
+  {evidence}
 
   Question:
   {question}
@@ -146,55 +188,55 @@ prompt_template: |
   {choices}
 
   Answer this question carefully and choose ONE best answer.
-  Only return JSON in the following format:
+  Only return JSON in the following format, do not add any other text outside the JSON:
   {{
     "answer": "A or B or C or D",
     "explanation": "explanation about the answer",
     "confidence": confidence from 0 to 1
   }}
+
+retrieval:
+  enabled: true
+  top_k: 5
 ```
 
-**Lưu ý khi sửa prompt:**
-- Giữ nguyên `{question}` và `{choices}` — chúng được điền tự động lúc chạy.
-- Giữ nguyên `{{ }}` quanh ví dụ JSON (dấu ngoặc kép để `.format()` không bị nhầm).
+**Lưu ý quan trọng khi sửa đổi prompt:**
+- Giữ nguyên các thẻ đặt chỗ `{question}`, `{choices}`.
+- Với luồng RAG, cần giữ lại thẻ `{evidence}`.
+- Giữ nguyên cú pháp ngoặc nhọn kép `{{ }}` bao bọc phần cấu trúc JSON mẫu của câu trả lời để tránh lỗi biên dịch chuỗi `.format()`.
 
 ---
 
-## 🔧 Cách tạo biến thể mới (V1, V2, ...)
+## 🔧 Cách tạo biến thể thử nghiệm mới (v2, v3...)
 
-```bash
-cp configs/v0.yaml configs/v1.yaml
-# Sửa variant, prompt_template, model, temperature trong v1.yaml
-python main.py --mode benchmark --config configs/v1.yaml --split train --limit 20
-```
+Để thử nghiệm một cấu hình hoặc prompt mới độc lập mà không ảnh hưởng đến các phiên bản cũ:
 
-Output sẽ tự động tạo ra `predictions_v1_train.jsonl` và `run_config_v1_train.json` — **không đụng chạm** vào kết quả của v0.
-
----
-
-## 🔬 Nguyên tắc quan trọng
-
-1. **Chỉ có 2 split:** `train` và `test` (không có `dev`). Dùng `--split train --limit N` để debug; chỉ chạy `--split test` đúng **1 lần** khi config đã "khoá".
-2. **Không rò rỉ gold answer:** `answer_idx` (đáp án đúng) không bao giờ được đưa vào pipeline → chỉ ghi ra `gold_{split}.jsonl`.
-3. **`question_id` ổn định:** Sinh dạng `{split}_{index}` dựa vào thứ tự dòng của HuggingFace dataset — luôn nhất quán giữa các lần chạy.
-4. **Config = snapshot:** `run_config_{variant}_{split}.json` lưu lại chính xác prompt + tham số đã dùng → phục vụ tái lập kết quả sau này.
+1. Tạo file cấu hình mới từ file mẫu:
+   ```bash
+   cp configs/v1.yaml configs/v2.yaml
+   ```
+2. Thay đổi giá trị trường `variant` bên trong file cấu hình mới (ví dụ: `variant: "v2"`), điều chỉnh prompt hoặc tham số nhiệt độ (`temperature`).
+3. Chạy benchmark sử dụng file cấu hình mới:
+   ```bash
+   python3 main.py --mode benchmark --config configs/v2.yaml --split train --limit 20
+   ```
+Các file kết quả sẽ được lưu độc lập dưới tên dạng `predictions_v2_...` trong thư mục `output/`.
 
 ---
 
-## 🗓️ Roadmap
+## 🔬 Các nguyên tắc phát triển cốt lõi
+
+1. **Không rò rỉ đáp án đúng (No gold leakage):** Tuyệt đối không đưa đáp án đúng (`answer_idx`) vào bất kỳ nút nào trong luồng xử lý hoặc cấu trúc `AgentState`.
+2. **Quản lý cấu hình dạng Snapshot:** Mọi tham số ảnh hưởng tới kết quả kiểm thử phải được lưu kèm trong file cấu hình của lượt chạy để đảm bảo tính tái lập.
+3. **Xử lý lỗi ngoại lệ an toàn:** Lỗi phát sinh từ một câu hỏi đơn lẻ hoặc lỗi kết nối dịch vụ truy xuất (retrieval) không được làm dừng toàn bộ quá trình chạy benchmark.
+4. **Phân tách chấm điểm:** Toàn bộ công việc chấm điểm và thống kê được thực hiện riêng biệt thông qua script đánh giá (ví dụ: `evaluate.py`), dựa trên việc kết hợp file `predictions` và file `gold` thông qua trường `question_id`.
+
+---
+
+## 🗓️ Lộ trình dự án (Roadmap)
 
 | Giai đoạn | Trạng thái | Mô tả |
 |---|---|---|
-| **v0 — Baseline** | ✅ Xong | Pipeline đơn giản: Input → Reasoning Agent → Output |
-| **evaluate.py** | 🔜 Tiếp theo | Chấm điểm accuracy bằng cách join `predictions_v0_test.jsonl` với `gold_test.jsonl` theo `question_id` |
-| **v1 — Retrieval** | 📋 Kế hoạch | Thêm Retrieval Agent (RAG) vào graph |
-| **v2 — Verifier** | 📋 Kế hoạch | Thêm Verifier Agent để kiểm tra lại kết quả |
-
----
-
-## 📝 Bước tiếp theo (cho thành viên mới)
-
-1. **Chạy thử v0** trên 5–20 câu train để hiểu output.
-2. **Viết `evaluate.py`** để tính accuracy từ `predictions_v0_test.jsonl` + `gold_test.jsonl`.
-3. **Chạy v0 trên toàn bộ test set** (1273 câu) để có baseline chính thức.
-4. Dựa vào baseline → thử nghiệm prompt mới hoặc thêm agent mới (v1, v2...).
+| **v0 — Baseline** | ✅ Hoàn thành | Luồng suy luận cơ bản: Input → Reasoning Agent → Output |
+| **v1 — Retrieval (RAG)** | ✅ Hoàn thành | Luồng bổ sung tri thức: Input → Retrieval Agent (Chroma DB) → Reasoning Agent → Output |
+| **v2 — Verifier** | 📋 Lên kế hoạch | Luồng tối ưu hóa độ chính xác bằng cách thêm Verifier Agent kiểm chứng đáp án trước khi xuất dữ liệu |

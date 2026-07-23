@@ -1,6 +1,5 @@
 # V0 - Baseline: chỉ Reasoning Agent, không RAG, không Verifier
 variant: "v0"
-model: "gemini-3.5-flash-lite"
 prompt_version: "v1"    # chỉ là nhãn để log/so sánh - không dùng để tra cứu
 temperature: 0.0
 seed: null

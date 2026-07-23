@@ -1,7 +1,7 @@
 import json
 import re
 import time
-from typing import Optional
+from typing import Any, Optional
 
 from llm_client import build_llm
 from run_config import RunConfig
@@ -15,6 +15,27 @@ def _extract_json(text: str) -> dict:
     match = re.search(r"\{.*\}", text, re.DOTALL)
     raw = match.group(0) if match else text
     return json.loads(raw)
+
+
+def _format_evidence(retrieved_docs: Optional[list[Any]]) -> str:
+    """Render `state["retrieved_docs"]` (list[dict] từ Retrieval Agent)
+    thành text để chèn vào prompt. Khi retrieval chưa bật (v0), state
+    không có retrieved_docs -> trả về câu mặc định, prompt v0 vẫn không
+    tham chiếu {evidence} nên giá trị này bị bỏ qua, không ảnh hưởng gì.
+    """
+    if not retrieved_docs:
+        return "No retrieved evidence."
+
+    blocks = []
+    for i, doc in enumerate(retrieved_docs, start=1):
+        if not isinstance(doc, dict) or doc.get("error"):
+            continue
+        title = doc.get("title") or "unknown source"
+        source = doc.get("source") or "unknown corpus"
+        text = doc.get("text", "")
+        blocks.append(f"[{i}] title={title}; source={source}\n{text}")
+
+    return "\n\n".join(blocks) if blocks else "No retrieved evidence."
 
 
 def _estimate_cost(token_usage: Optional[dict], pricing) -> Optional[float]:
@@ -45,7 +66,11 @@ def make_reasoning_agent_node(run_config: RunConfig):
         choices_text = "\n".join(
             f"{label}. {choice}" for label, choice in zip(LABELS, state["choices"])
         )
-        prompt = prompt_template.format(question=state["question"], choices=choices_text)
+        prompt = prompt_template.format(
+            question=state["question"],
+            choices=choices_text,
+            evidence=_format_evidence(state.get("retrieved_docs")),
+        )
 
         start = time.perf_counter()
         response = llm.invoke(prompt)

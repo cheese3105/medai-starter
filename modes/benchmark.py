@@ -18,6 +18,7 @@ Nguyên tắc bắt buộc:
 """
 
 import json
+import time
 from pathlib import Path
 
 from datasets import load_dataset
@@ -64,21 +65,24 @@ def run_benchmark(config_path: str, split: str = "test", limit: int | None = Non
 
     app = build_graph(run_config)
 
-    output_dir = Path("output")
-    output_dir.mkdir(exist_ok=True)
+    timestamp = int(time.time())
+    run_dir_name = f"{run_config.variant}_{split}_{timestamp}"
+    run_dir = Path("output") / run_dir_name
+    run_dir.mkdir(parents=True, exist_ok=True)
 
-    pred_path = output_dir / f"predictions_{run_config.variant}_{split}.jsonl"
-    gold_path = output_dir / f"gold_{split}.jsonl"
-    config_out_path = output_dir / f"run_config_{run_config.variant}_{split}.json"
+    pred_path = run_dir / f"predictions_{run_config.variant}_{split}_{timestamp}.jsonl"
+    gold_path = run_dir / f"gold_{split}_{timestamp}.jsonl"
+    config_out_path = run_dir / f"run_config_{run_config.variant}_{split}_{timestamp}.jsonl"
     gold_already_exists = gold_path.exists()
 
-    # run_config lưu 1 lần/file riêng (không lặp lại ở từng dòng jsonl)
+    # run_config lưu 1 lần/file riêng (dạng jsonl)
     with open(config_out_path, "w", encoding="utf-8") as f:
-        json.dump(
-            {**run_config.to_dict(), "split": split, "num_questions": len(dataset)},
-            f,
-            ensure_ascii=False,
-            indent=2,
+        f.write(
+            json.dumps(
+                {**run_config.to_dict(), "split": split, "num_questions": len(dataset)},
+                ensure_ascii=False,
+            )
+            + "\n"
         )
 
     with open(pred_path, "w", encoding="utf-8") as pred_f, \

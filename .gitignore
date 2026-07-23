@@ -12,6 +12,7 @@ build/
 
 # Virtual environment
 venv/
+.venv/
 env/
 .env/
 
@@ -19,6 +20,7 @@ env/
 .env
 
 # Large files
+data/
 Archive.zip
 *.zip
 

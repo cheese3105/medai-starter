@@ -6,6 +6,7 @@ seed, retrieval, verifier) đọc từ file YAML - KHÔNG hard-code trong code.
 run_config đầy đủ cho từng file predictions.
 """
 
+import os
 from dataclasses import dataclass, field, asdict
 from typing import Optional
 
@@ -50,14 +51,19 @@ def load_run_config(path: str) -> RunConfig:
     with open(path, "r", encoding="utf-8") as f:
         raw = yaml.safe_load(f)
 
-    required = ["variant", "model", "prompt_version", "prompt_template"]
+    # model is now optional in YAML since it is defined in .env
+    required = ["variant", "prompt_version", "prompt_template"]
     missing = [k for k in required if k not in raw]
     if missing:
         raise ValueError(f"File config '{path}' thiếu trường bắt buộc: {missing}")
 
+    model_name = os.getenv("REASONING_MODEL") or raw.get("model")
+    if not model_name:
+        raise ValueError(f"Model name is not defined. Please set REASONING_MODEL in .env or 'model' in config '{path}'")
+
     return RunConfig(
         variant=raw["variant"],
-        model=raw["model"],
+        model=model_name,
         prompt_version=raw["prompt_version"],
         prompt_template=raw["prompt_template"],
         temperature=raw.get("temperature", 0.0),
