@@ -1,0 +1,123 @@
+# V2 - Multi-agent: Retrieval Agent (tự đánh giá + truy vấn lại tối đa 2
+# lần) -> Reasoning Agent -> Verifier Agent (kiểm chứng bằng evidence, chốt
+# đáp án cuối). So sánh với v1 để đo mức tăng accuracy/độ tin cậy nhờ
+# Verifier, và chi phí/latency tăng thêm do 2 lời gọi LLM phụ (self-check +
+# verify).
+variant: "v2"
+prompt_version: "v2_rag_verified"
+temperature: 0.0
+seed: null
+debug: true
+
+# Prompt cho Reasoning Agent - giữ nguyên như v1 (vẫn cần {evidence},
+# {question}, {choices}). Verifier Agent dùng prompt riêng (xem
+# agents/verifier_agent.py::DEFAULT_VERIFIER_PROMPT, có thể override bằng
+# verifier.prompt_template dưới đây nếu muốn tuỳ biến).
+prompt_template: |
+  Use the retrieved evidence below if it is relevant to the question.
+  If the evidence is irrelevant or conflicting, ignore it and answer from
+  your own medical knowledge instead.
+
+  Retrieved evidence:
+  {evidence}
+
+  Question:
+  {question}
+
+  Choices:
+  {choices}
+
+  Answer this question carefully and choose ONE best answer.
+  Only return JSON in the following format, do not add any other text outside the JSON:
+  {{
+    "answer": "A or B or C or D",
+    "explanation": "explanation about the answer",
+    "confidence": confidence from 0 to 1
+  }}
+
+retrieval:
+  enabled: true
+  top_k: 5
+  # >1 -> sau khi lấy evidence, tự chấm "đủ chưa" bằng 1 lời gọi LLM; nếu
+  # chưa đủ (score < sufficiency_threshold) thì tự viết lại query và truy
+  # vấn lại, tối đa max_iterations lần.
+  max_iterations: 2
+  sufficiency_threshold: 0.6
+  # null -> dùng chung model + provider với Reasoning Agent (REASONING_MODEL_*).
+  # Set tên model khác để dùng provider riêng cho bước tự đánh giá này
+  # (đọc qua RETRIEVAL_CHECK_MODEL_BASE_URL/_API_KEY trong .env, xem env-example).
+  check_model: null
+  prompt_template: |
+    You are grading whether the retrieved evidence below is
+    enough to answer a medical multiple-choice question. Be strict - only say
+    sufficient=true if the evidence actually lets someone pick the right choice.
+
+    Question:
+    {question}
+
+    Choices:
+    {choices}
+
+    Retrieved evidence so far:
+    {evidence}
+
+    Return JSON only, no other text:
+    {{
+      "sufficient": true or false,
+      "sufficiency_score": confidence from 0 to 1 that the evidence is enough,
+      "next_query": "a reformulated, more specific search query to find the missing evidence (only used if sufficient=false)"
+    }}
+
+verifier:
+  enabled: true
+  # "annotate_and_guard": không tự đổi đáp án khi evidence không hỗ trợ -
+  # chỉ hạ confidence + gắn verifier_verdict="unsupported" để error analysis.
+  mode: "annotate_and_guard"
+  # null -> dùng chung model + provider với Reasoning Agent. Set tên model
+  # khác để verifier gọi 1 provider riêng (đọc qua
+  # VERIFIER_MODEL_BASE_URL/_API_KEY trong .env, xem env-example).
+  model: null
+  prompt_template: |
+    You are a careful medical fact-checker. Your job is to
+    check whether a draft answer to a medical multiple-choice question is actually
+    supported by the retrieved evidence below - NOT to re-solve the question from
+    scratch.
+
+    Question:
+    {question}
+
+    Choices:
+    {choices}
+
+    Retrieved evidence:
+    {evidence}
+
+    Draft answer: {draft_answer}
+    Draft explanation: {draft_explanation}
+
+    Instructions:
+    - If the evidence clearly supports the draft answer, verdict="supported".
+    - If the evidence is irrelevant, missing, or too weak to confirm the draft
+      answer, verdict="unsupported" - do NOT invent support that isn't there.
+    - If the evidence partially supports it (e.g. supports the general topic but
+      not the specific choice), verdict="partial".
+    - Only change final_answer away from the draft answer if the evidence
+      clearly and specifically points to a different choice. Otherwise keep
+      final_answer equal to the draft answer.
+    - final_confidence should be LOWER than the draft confidence when verdict is
+      "unsupported" or "partial", and can stay the same or increase slightly
+      when verdict is "supported".
+
+    Return JSON only, no other text outside the JSON:
+    {{
+      "verdict": "supported" or "partial" or "unsupported",
+      "support_score": confidence from 0 to 1 that the evidence backs the answer,
+      "final_answer": "A" or "B" or "C" or "D",
+      "final_explanation": "short explanation citing which evidence was used (or noting the lack of it)",
+      "final_confidence": confidence from 0 to 1,
+      "notes": "one short sentence on why you made this decision"
+    }}
+
+pricing:
+  input_per_1k: null
+  output_per_1k: null

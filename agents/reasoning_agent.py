@@ -46,6 +46,16 @@ def _estimate_cost(token_usage: Optional[dict], pricing) -> Optional[float]:
     return (input_tokens / 1000) * pricing.input_per_1k + (output_tokens / 1000) * pricing.output_per_1k
 
 
+def _add_tokens(u1: Optional[dict], u2: Optional[dict]) -> Optional[dict]:
+    if not u1: return u2
+    if not u2: return u1
+    return {
+        "input_tokens": u1.get("input_tokens", 0) + u2.get("input_tokens", 0),
+        "output_tokens": u1.get("output_tokens", 0) + u2.get("output_tokens", 0),
+        "total_tokens": u1.get("total_tokens", 0) + u2.get("total_tokens", 0),
+    }
+
+
 def make_reasoning_agent_node(run_config: RunConfig):
     """Factory tạo node Reasoning Agent, đóng gói run_config qua closure.
 
@@ -72,6 +82,11 @@ def make_reasoning_agent_node(run_config: RunConfig):
             evidence=_format_evidence(state.get("retrieved_docs")),
         )
 
+        if run_config.debug:
+            print(f"\n--- [Reasoning Agent] Handling Question ID: {state.get('question_id')} ---")
+            print(f"[Reasoning Agent] Input Question: {state['question']}")
+            print(f"[Reasoning Agent] Choices:\n{choices_text}")
+
         start = time.perf_counter()
         response = llm.invoke(prompt)
         latency_ms = (time.perf_counter() - start) * 1000
@@ -88,15 +103,23 @@ def make_reasoning_agent_node(run_config: RunConfig):
             parsed = {}
             predicted = "INVALID"
 
+        if run_config.debug:
+            print(f"[Reasoning Agent] Output: Draft Answer = '{predicted}', Confidence = {parsed.get('confidence')}")
+
+        total_latency = (state.get("latency_ms") or 0.0) + latency_ms
+        total_tokens = _add_tokens(state.get("token_usage"), token_usage)
+
         return {
             **state,
             "answer": predicted,
             "explanation": parsed.get("explanation"),
             "confidence": parsed.get("confidence"),
             "raw_output": raw_output,
-            "latency_ms": latency_ms,
-            "token_usage": token_usage,
-            "estimated_cost": _estimate_cost(token_usage, run_config.pricing),
+            "reasoning_latency_ms": latency_ms,
+            "reasoning_token_usage": token_usage,
+            "latency_ms": total_latency,
+            "token_usage": total_tokens,
+            "estimated_cost": _estimate_cost(total_tokens, run_config.pricing),
         }
 
     return reasoning_agent_node

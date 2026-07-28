@@ -44,13 +44,36 @@ def _to_agent_input(row: dict, question_id: str) -> dict:
         "estimated_cost": None,
         "retrieved_docs": None,
         "agent_trace": None,
+        "query_history": None,
+        "retrieval_iterations": None,
+        "retrieval_sufficiency": None,
+        "verifier_verdict": None,
+        "verifier_support_score": None,
+        "verifier_notes": None,
+        "retrieval_latency_ms": None,
+        "retrieval_token_usage": None,
+        "reasoning_latency_ms": None,
+        "reasoning_token_usage": None,
+        "verifier_latency_ms": None,
+        "verifier_token_usage": None,
     }
 
 
 def run_benchmark(config_path: str, split: str = "test", limit: int | None = None) -> None:
     run_config = load_run_config(config_path)
 
-    print(f"Variant: {run_config.variant} | Model: {run_config.model} | Split: {split}")
+    print(f"Variant: {run_config.variant} | Split: {split}")
+    print(f"  - Reasoning Agent: {run_config.model}")
+    if run_config.retrieval.enabled:
+        retrieval_model = run_config.retrieval.check_model or run_config.model
+        print(f"  - Retrieval Agent: {retrieval_model} (Self-check loops: max_iterations={run_config.retrieval.max_iterations})")
+    else:
+        print(f"  - Retrieval Agent: Disabled")
+    if run_config.verifier.enabled:
+        verifier_model = run_config.verifier.model or run_config.model
+        print(f"  - Verifier Agent:  {verifier_model} (Mode: {run_config.verifier.mode})")
+    else:
+        print(f"  - Verifier Agent:   Disabled")
 
     if split == "test" and limit is None:
         print(
@@ -109,6 +132,18 @@ def run_benchmark(config_path: str, split: str = "test", limit: int | None = Non
                 "estimated_cost": out.get("estimated_cost"),
                 "retrieved_docs": out.get("retrieved_docs"),
                 "agent_trace": out.get("agent_trace"),
+                "query_history": out.get("query_history"),
+                "retrieval_iterations": out.get("retrieval_iterations"),
+                "retrieval_sufficiency": out.get("retrieval_sufficiency"),
+                "verifier_verdict": out.get("verifier_verdict"),
+                "verifier_support_score": out.get("verifier_support_score"),
+                "verifier_notes": out.get("verifier_notes"),
+                "retrieval_latency_ms": out.get("retrieval_latency_ms"),
+                "retrieval_token_usage": out.get("retrieval_token_usage"),
+                "reasoning_latency_ms": out.get("reasoning_latency_ms"),
+                "reasoning_token_usage": out.get("reasoning_token_usage"),
+                "verifier_latency_ms": out.get("verifier_latency_ms"),
+                "verifier_token_usage": out.get("verifier_token_usage"),
             }
             pred_f.write(json.dumps(prediction, ensure_ascii=False) + "\n")
 

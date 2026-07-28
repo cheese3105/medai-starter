@@ -1,8 +1,13 @@
-# Med-AI Starter (Phiên bản v1 - Tích hợp RAG)
+# Med-AI Starter (Phiên bản v2 - Multi-agent: Retrieval → Reasoning → Verifier)
 
 Đây là mã nguồn khởi đầu cho bài toán **trả lời câu hỏi trắc nghiệm y khoa** (Medical QA), sử dụng tập dữ liệu [MedQA-USMLE-4-options](https://huggingface.co/datasets/GBaker/MedQA-USMLE-4-options).
 
-Phiên bản hiện tại (v1) đã được tích hợp thêm cơ chế **Retrieval-Augmented Generation (RAG)** để truy xuất kiến thức y khoa từ giáo trình làm bằng chứng (evidence) hỗ trợ quá trình suy luận của mô hình.
+Phiên bản hiện tại (v2) là một hệ **multi-agent tuần tự 3 bước**:
+- **Retrieval Agent**: truy xuất bằng chứng từ ChromaDB (bge-m3), tự đánh giá evidence đã đủ chưa và có thể tự viết lại truy vấn để tìm thêm.
+- **Reasoning Agent**: suy luận lâm sàng từ evidence, sinh đáp án + giải thích + confidence.
+- **Verifier Agent**: kiểm chứng đáp án có thực sự được evidence hỗ trợ không, rồi chốt đáp án cuối cùng (không tự bịa đáp án khi thiếu bằng chứng).
+
+Cả 3 agent đều bật/tắt độc lập qua file YAML (không sửa code) - v0 và v1 vẫn chạy y hệt như trước.
 
 ---
 
@@ -32,6 +37,24 @@ Yêu cầu (câu hỏi + 4 lựa chọn)
 Kết quả (đáp án A/B/C/D + giải thích + confidence)
 ```
 
+### 3. Luồng v2 (Multi-agent - Retrieval → Reasoning → Verifier)
+```
+Yêu cầu (câu hỏi + 4 lựa chọn)
+         ↓
+  Retrieval Agent ⟲ (truy xuất Chroma, tự đánh giá đủ chưa,
+                      tự viết lại truy vấn nếu chưa đủ - tối đa N vòng)
+         ↓
+   Reasoning Agent (LLM sinh đáp án nháp + giải thích + confidence)
+         ↓
+  Verifier Agent (đối chiếu đáp án với evidence, chốt đáp án cuối,
+                   hạ confidence/gắn cờ nếu không được evidence hỗ trợ)
+         ↓
+Kết quả (đáp án A/B/C/D + giải thích + confidence + verifier_verdict)
+```
+
+`retrieval.max_iterations=1` (mặc định) tắt hoàn toàn vòng tự đánh giá của Retrieval Agent -> luồng v1 chạy y hệt như cũ, không tốn thêm chi phí.
+`verifier.enabled=false` (mặc định) tắt hoàn toàn Verifier Agent -> luồng v0/v1 không đổi.
+
 ---
 
 ## 🗺️ Cấu trúc thư mục
@@ -45,8 +68,9 @@ medai-starter-with-rag/
 ├── graph.py                 # Định nghĩa và kết nối luồng xử lý (LangGraph)
 │
 ├── agents/
-│   ├── reasoning_agent.py   # Agent suy luận: gọi LLM để đưa ra đáp án cuối cùng
-│   └── retrieval_agent.py   # Agent truy xuất: tìm bằng chứng từ vector database
+│   ├── reasoning_agent.py   # Agent suy luận: gọi LLM để đưa ra đáp án nháp
+│   ├── retrieval_agent.py   # Agent truy xuất: tìm bằng chứng + tự đánh giá/truy vấn lại (v2)
+│   └── verifier_agent.py    # Agent kiểm chứng: đối chiếu đáp án với evidence, chốt đáp án (v2)
 │
 ├── retrieval/
 │   ├── ingest_data.py       # Pipeline lưu trữ dữ liệu giáo trình vào database Chroma
@@ -54,7 +78,8 @@ medai-starter-with-rag/
 │
 ├── configs/
 │   ├── v0.yaml              # Cấu hình baseline (không bật RAG)
-│   └── v1.yaml              # Cấu hình RAG (bật retrieval, k=5)
+│   ├── v1.yaml              # Cấu hình RAG (bật retrieval, k=5)
+│   └── v2.yaml              # Cấu hình multi-agent (retrieval self-retry + verifier)
 │
 ├── output/                  # Thư mục lưu kết quả chạy benchmark
 │   ├── predictions_{variant}_{split}.jsonl  # Dự đoán của Agent
@@ -95,6 +120,17 @@ cp env-example .env
 REASONING_MODEL=gemini-3.5-flash-lite                   # Tên mô hình chính sử dụng
 REASONING_MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai  # Endpoint OpenAI-compatible
 REASONING_MODEL_API_KEY=your_reasoning_model_api_key    # API key của mô hình suy luận
+
+# --- Optional (v2) - Tên mô hình riêng và thông tin endpoint cho các Agent phụ ---
+# Set nếu muốn chạy Verifier hoặc Retrieval self-check bằng mô hình/provider riêng biệt.
+# Nếu để trống (hoặc không định nghĩa BASE_URL/API_KEY), hệ thống tự động fallback sử dụng chung REASONING_MODEL.
+VERIFIER_MODEL=gemini-3.5-flash-lite
+VERIFIER_MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+VERIFIER_MODEL_API_KEY=your_verifier_model_api_key
+
+RETRIEVAL_CHECK_MODEL=gemini-3.5-flash-lite
+RETRIEVAL_CHECK_MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+RETRIEVAL_CHECK_MODEL_API_KEY=your_retrieval_check_model_api_key
 
 # Cấu hình mô hình nhúng (Embedding Model) - Cần thiết cho RAG
 EMBEDDING_MODEL=baai/bge-m3                             # Tên mô hình nhúng
@@ -158,7 +194,7 @@ Mỗi lượt chạy benchmark sẽ tự động tạo ra một thư mục riên
 
 | File | Nội dung |
 |---|---|
-| `output/{variant}_{split}_{timestamp}/predictions_{variant}_{split}_{timestamp}.jsonl` | Chứa dự đoán của mô hình: câu hỏi, các lựa chọn, đáp án mô hình chọn (`predicted_answer`), giải thích, độ tin cậy, dữ liệu truy xuất (`retrieved_docs`), và chi phí / thời gian phản hồi. |
+| `output/{variant}_{split}_{timestamp}/predictions_{variant}_{split}_{timestamp}.jsonl` | Chứa dự đoán của mô hình: câu hỏi, các lựa chọn, đáp án mô hình chọn (`predicted_answer`), giải thích, độ tin cậy, dữ liệu truy xuất (`retrieved_docs`), chi phí (`estimated_cost`), tổng thời gian / token của cả luồng (`latency_ms`, `token_usage`), và thông số chi tiết của từng agent (`retrieval_latency_ms`, `retrieval_token_usage`, `reasoning_latency_ms`, `reasoning_token_usage`, `verifier_latency_ms`, `verifier_token_usage`). |
 | `output/{variant}_{split}_{timestamp}/gold_{split}_{timestamp}.jsonl` | Đáp án đúng thực tế của bộ câu hỏi. Được lưu riêng để làm cơ sở tính điểm mà không bị rò rỉ vào luồng suy luận. |
 | `output/{variant}_{split}_{timestamp}/run_config_{variant}_{split}_{timestamp}.jsonl` | Bản lưu snapshot cấu hình đầy đủ của lượt chạy (model, prompt template, temperature...) dưới dạng một dòng JSON. |
 
@@ -166,50 +202,59 @@ Mỗi lượt chạy benchmark sẽ tự động tạo ra một thư mục riên
 
 ## ✏️ Cách chỉnh sửa Prompt và Cấu hình Thử nghiệm
 
-Bạn có thể thay đổi prompt trực tiếp trong các file cấu hình YAML tại thư mục `configs/` mà không cần sửa đổi mã nguồn Python:
-
-```yaml
-# configs/v1.yaml
-variant: "v1"
-prompt_version: "v1_rag"
-temperature: 0.0
-seed: null
-
-prompt_template: |
-  Use the retrieved evidence below if it is relevant to the question.
-  If the evidence is irrelevant or conflicting, ignore it and answer from
-  your own medical knowledge instead.
-
-  Retrieved evidence:
-  {evidence}
-
-  Question:
-  {question}
-
-  Choices:
-  {choices}
-
-  Answer this question carefully and choose ONE best answer.
-  Only return JSON in the following format, do not add any other text outside the JSON:
-  {{
-    "answer": "A or B or C or D",
-    "explanation": "explanation about the answer",
-    "confidence": confidence from 0 to 1
-  }}
-
-retrieval:
-  enabled: true
-  top_k: 5
-```
-
-**Lưu ý quan trọng khi sửa đổi prompt:**
-- Giữ nguyên các thẻ đặt chỗ `{question}`, `{choices}`.
-- Với luồng RAG, cần giữ lại thẻ `{evidence}`.
-- Giữ nguyên cú pháp ngoặc nhọn kép `{{ }}` bao bọc phần cấu trúc JSON mẫu của câu trả lời để tránh lỗi biên dịch chuỗi `.format()`.
+Bạn có thể thay đổi prompt trực tiếp trong các file cấu hình YAML tại thư mục `configs/` mà không cần sửa đổi mã nguồn Python.
 
 ---
 
-## 🔧 Cách tạo biến thể thử nghiệm mới (v2, v3...)
+## 🧩 Cấu hình Multi-agent (v2 - Retrieval self-retry + Verifier)
+
+`configs/v2.yaml` bật cả 2 cơ chế mới, độc lập nhau:
+
+```yaml
+debug: true                   # Bật/tắt chế độ in log debug hiển thị quá trình chạy chi tiết của từng agent
+retrieval:
+  enabled: true
+  top_k: 5
+  max_iterations: 2           # >1 -> bật vòng tự đánh giá + truy vấn lại
+  sufficiency_threshold: 0.6  # ngưỡng "đủ evidence" (0-1)
+  check_model: null           # null -> dùng chung model+provider với Reasoning Agent hoặc cấu hình qua RETRIEVAL_CHECK_MODEL trong .env
+  prompt_template: |          # Template prompt tự đánh giá độ đầy đủ của evidence (sửa trực tiếp trong YAML)
+    You are grading whether the retrieved evidence below is...
+    {question} ... {choices} ... {evidence}
+
+verifier:
+  enabled: true
+  mode: "annotate_and_guard"  # xem giải thích bên dưới
+  model: null                 # null -> dùng chung model+provider với Reasoning Agent hoặc cấu hình qua VERIFIER_MODEL trong .env
+  prompt_template: |          # Template prompt kiểm chứng đáp án (sửa trực tiếp trong YAML)
+    You are a careful medical fact-checker...
+```
+
+**Chế độ Debug (`debug: true`)**: khi bật, terminal sẽ in chi tiết câu hỏi đang gửi, agent nào đang xử lý, các vòng truy vấn lại của Retrieval (reformulated query), kết quả đánh giá sufficiency, và kết quả chốt/audit của Verifier.
+
+**Retrieval self-retry (`retrieval.max_iterations`)**: sau khi lấy `top_k` evidence, nếu `max_iterations > 1`, agent gọi thêm 1 lời gọi LLM để tự chấm điểm "evidence đã đủ để trả lời chưa" (`sufficiency_score`). Nếu chưa đủ, agent tự viết lại truy vấn (`next_query`) và tìm lại, tối đa `max_iterations` lần, rồi gộp + khử trùng lặp toàn bộ evidence đã tìm được (giữ lại `top_k` evidence tốt nhất theo điểm tương đồng). Đặt `max_iterations: 1` để tắt hẳn cơ chế này (giống hệt hành vi v1, không tốn thêm chi phí). Bạn có thể chỉnh sửa prompt tự đánh giá trực tiếp qua trường `retrieval.prompt_template`.
+
+**Verifier Agent (`verifier.enabled`)**: chạy sau Reasoning Agent, đối chiếu đáp án nháp với evidence đã truy xuất và trả về `verdict` (`supported`/`partial`/`unsupported`) + `support_score`. Với `mode: "annotate_and_guard"` (mặc định, khuyến nghị cho domain y tế): khi `verdict = unsupported`, Verifier **không được phép** tự đổi sang đáp án khác - chỉ hạ `confidence` xuống tối đa 0.3 và gắn cờ để phục vụ error analysis, tránh việc verifier "tự tin sai" thay vì báo không chắc. Dùng `mode: "annotate_only"` nếu chỉ muốn gắn nhãn/điểm mà không đổi confidence. Bạn có thể chỉnh sửa prompt kiểm chứng trực tiếp qua trường `verifier.prompt_template`.
+
+**Dùng model/provider riêng cho Verifier hoặc Retrieval self-check (`verifier.model` / `retrieval.check_model`)**: mặc định (`null`) cả 2 bước phụ này dùng **chung endpoint + API key** với Reasoning Agent (đọc từ `REASONING_MODEL_BASE_URL`/`REASONING_MODEL_API_KEY`). Muốn verifier/retrieval-check gọi sang **1 provider/mô hình hoàn toàn khác**, bạn có thể cấu hình tên model trực tiếp trong YAML (`check_model` / `model`) hoặc đặt tên biến môi trường trong `.env` (`VERIFIER_MODEL` / `RETRIEVAL_CHECK_MODEL`) kèm base_url và api_key của chúng.
+
+**Các field mới được ghi vào `predictions.jsonl` để phân tích:**
+- **Thông số flow tổng:** `latency_ms` (tổng thời gian toàn bộ luồng), `token_usage` (tổng token tiêu thụ của cả 3 agent), `estimated_cost` (tổng chi phí ước tính).
+- **Thông số chi tiết từng agent:**
+  - **Retrieval:** `retrieval_latency_ms`, `retrieval_token_usage`, `query_history`, `retrieval_iterations`, `retrieval_sufficiency`.
+  - **Reasoning:** `reasoning_latency_ms`, `reasoning_token_usage`.
+  - **Verifier:** `verifier_latency_ms`, `verifier_token_usage`, `verifier_verdict`, `verifier_support_score`, `verifier_notes`.
+
+
+Chạy thử nhanh để so sánh v1 vs v2:
+```bash
+python3 main.py --mode benchmark --config configs/v1.yaml --split train --limit 20
+python3 main.py --mode benchmark --config configs/v2.yaml --split train --limit 20
+```
+
+---
+
+## 🔧 Cách tạo biến thể thử nghiệm mới (v3...)
 
 Để thử nghiệm một cấu hình hoặc prompt mới độc lập mà không ảnh hưởng đến các phiên bản cũ:
 
@@ -241,4 +286,6 @@ Các file kết quả sẽ được lưu độc lập dưới tên dạng `predi
 |---|---|---|
 | **v0 — Baseline** | ✅ Hoàn thành | Luồng suy luận cơ bản: Input → Reasoning Agent → Output |
 | **v1 — Retrieval (RAG)** | ✅ Hoàn thành | Luồng bổ sung tri thức: Input → Retrieval Agent (Chroma DB) → Reasoning Agent → Output |
-| **v2 — Verifier** | 📋 Lên kế hoạch | Luồng tối ưu hóa độ chính xác bằng cách thêm Verifier Agent kiểm chứng đáp án trước khi xuất dữ liệu |
+| **v2 — Verifier** | ✅ Hoàn thành | Luồng multi-agent: Retrieval Agent (tự đánh giá + truy vấn lại) → Reasoning Agent → Verifier Agent kiểm chứng đáp án bằng evidence trước khi xuất dữ liệu |
+| **v3 — Memory** | ⬜️ Chưa bắt đầu | Thực hiện lưu history của conversation lại để phục vụ cho việc hỏi các câu hỏi tiếp theo |
+| **evaluate.py** | ⬜️ Chưa bắt đầu | Tạo file evaluate.py và run với số lượng dữ liệu lớn để có cơ sở so sánh và đánh giá kết quả chạy từng version |
