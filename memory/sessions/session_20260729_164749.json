@@ -1,0 +1,36 @@
+{
+  "session_id": "20260729_164749",
+  "turns": [
+    {
+      "turn_id": 0,
+      "question": "A 23-year-old pregnant woman at 22 weeks gestation presents with burning upon urination. She states it started 1 day ago and has been worsening despite drinking more water and taking cranberry extract. She otherwise feels well and is followed by a doctor for her pregnancy. Her temperature is 97.7°F (36.5°C), blood pressure is 122/77 mmHg, pulse is 80/min, respirations are 19/min, and oxygen saturation is 98% on room air. Physical exam is notable for an absence of costovertebral angle tenderness and a gravid uterus. Which of the following is the best treatment for this patient? Choose 1 in following answers below \"Ampicillin\", \"Ceftriaxone\", \"Doxycycline\", \"Nitrofurantoin\"",
+      "answer": "[Error: 'question']",
+      "explanation": null,
+      "confidence": null,
+      "retrieved_docs": null,
+      "verifier_verdict": null,
+      "timestamp": 1785318471.5250723
+    },
+    {
+      "turn_id": 1,
+      "question": "who are you?",
+      "answer": "[Error: 'question']",
+      "explanation": null,
+      "confidence": null,
+      "retrieved_docs": null,
+      "verifier_verdict": null,
+      "timestamp": 1785318481.7704608
+    }
+  ],
+  "current_turn_id": 2,
+  "session_metadata": {
+    "session_start": 1785318471.5250704,
+    "total_questions": 2,
+    "mode": "unlimited"
+  },
+  "config": {
+    "max_turns": null,
+    "max_evidence_per_turn": 3,
+    "mode": "unlimited"
+  }
+}

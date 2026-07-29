@@ -30,7 +30,7 @@ import chromadb
 from dotenv import load_dotenv
 
 
-DEFAULT_INPUT_PATH = Path("data/corpus/medrag_textbooks/textbooks.jsonl")
+DEFAULT_INPUT_PATH = Path("data/data/corpus/medrag_textbooks/textbooks.jsonl")
 DEFAULT_CHROMA_DIR = Path("data/chroma/medrag_textbooks_bge_m3_openrouter")
 DEFAULT_COLLECTION_NAME = "medrag_textbooks"
 DEFAULT_BATCH_SIZE = 64

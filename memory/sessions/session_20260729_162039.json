@@ -1,0 +1,46 @@
+{
+  "session_id": "20260729_162039",
+  "turns": [
+    {
+      "turn_id": 0,
+      "question": "A 23-year-old pregnant woman at 22 weeks gestation presents with burning upon urination. She states it started 1 day ago and has been worsening despite drinking more water and taking cranberry extract. She otherwise feels well and is followed by a doctor for her pregnancy. Her temperature is 97.7°F (36.5°C), blood pressure is 122/77 mmHg, pulse is 80/min, respirations are 19/min, and oxygen saturation is 98% on room air. Physical exam is notable for an absence of costovertebral angle tenderness and a gravid uterus. Which of the following is the best treatment for this patient?",
+      "answer": "Chào bạn, dựa trên tình huống mô tả (thai phụ 22 tuần có triệu chứng tiểu buốt, không sốt, không đau lưng/hông), đây là dấu hiệu của **Nhiễm trùng tiểu (UTI)**. \n\n**Hướng xử lý chung:**\n*   Ở phụ nữ mang thai, mọi trường hợp nhiễm trùng tiểu đều cần được điều trị bằng kháng sinh theo chỉ định của bác sĩ để tránh biến chứng (như sinh non hoặc viêm đài bể thận).\n*   Các thuốc nam, thực phẩm chức năng (như cranberry) hay việc uống nhiều nước chỉ hỗ trợ chứ không thay thế được kháng sinh trong điều trị nhiễm trùng.\n*   Bác sĩ sản khoa hoặc chuyên khoa thận-tiết niệu sẽ kê đơn các loại kháng sinh an toàn cho thai kỳ (ví dụ: Nitrofurantoin, Amoxicillin, hoặc Cephalexin tùy theo tuổi thai và kết quả cấy nước tiểu).\n\n⚠️ **Lưu ý quan trọng:** Đây không phải là chẩn đoán y khoa chính thức. **Bạn nên đưa thai phụ đi khám bác sĩ ngay** để được xét nghiệm nước tiểu và kê đơn kháng sinh phù hợp. Không tự ý mua thuốc uống. Hãy đến viện ngay nếu xuất hiện sốt, đau thắt lưng, buồn nôn hoặc cơn gò tử cung.",
+      "explanation": null,
+      "confidence": null,
+      "retrieved_docs": null,
+      "verifier_verdict": null,
+      "timestamp": 1785316878.6253378
+    },
+    {
+      "turn_id": 1,
+      "question": "A 23-year-old pregnant woman at 22 weeks gestation presents with burning upon urination. She states it started 1 day ago and has been worsening despite drinking more water and taking cranberry extract. She otherwise feels well and is followed by a doctor for her pregnancy. Her temperature is 97.7°F (36.5°C), blood pressure is 122/77 mmHg, pulse is 80/min, respirations are 19/min, and oxygen saturation is 98% on room air. Physical exam is notable for an absence of costovertebral angle tenderness and a gravid uterus. Which of the following is the best treatment for this patient? Choose 1 in 4 answers: \"Ampicillin\", \"Ceftriaxone\", \"Doxycycline\", \"Nitrofurantoin\"",
+      "answer": "Chào bạn, đây là một câu hỏi trắc nghiệm y khoa kinh điển về xử trí nhiễm trùng đường tiểu (UTI) không biến chứng ở phụ nữ mang thai. \n\nĐáp án đúng cho trường hợp này là **Nitrofurantoin**.\n\n**Giải thích chi tiết:**\n1. **Chẩn đoán:** Bệnh nhân mang thai 22 tuần có triệu chứng tiểu buốt, không sốt, không đau góc sườn sống (CVA tenderness) -> Đây là **viêm bàng quang cấp (UTI dưới) ở phụ nữ mang thai**.\n2. **Nguyên tắc điều trị:** Phụ nữ mang thai bị UTI **luôn cần điều trị bằng kháng sinh**, kể cả khi không có triệu chứng (trong trường hợp vi khuẩn niệu không triệu chứng) hoặc có triệu chứng, nhằm ngăn ngừa tiến triển thành viêm đài bể thận cấp, sinh non và nhẹ cân.\n3. **Phân tích các lựa chọn:**\n   * **Nitrofurantoin:** Là một trong những lựa chọn hàng đầu (first-line) cho viêm bàng quang ở phụ nữ mang thai trong tam cá nguyệt thứ nhất và thứ hai. *(Lưu ý: Tránh dùng ở gần cuối tam cá nguyệt thứ ba - sau tuần 36 - do nguy cơ thiếu máu huyết tán ở trẻ sơ sinh).*\n   * **Doxycycline:** Chống chỉ định tuyệt đối trong thai kỳ vì gây tổn thương răng (vàng răng, thiểu sản men răng) và ảnh hưởng đến sự phát triển xương của thai nhi.\n   * **Ampicillin đơn độc:** Hiện nay tỷ lệ kháng thuốc của *E. coli* (tác nhân phổ biến nhất gây UTI) đối với ampicillin rất cao, nên không còn được khuyến cáo dùng đơn độc làm kinh nghiệm ban đầu.\n   * **Ceftriaxone:** Thường được giữ lại cho các trường hợp nhiễm trùng nặng hơn như viêm đài bể thận cấp cần nhập viện hoặc viêm thận bể thận điều trị ngoại trú, chứ không phải lựa chọn đầu tay cho viêm bàng quang không biến chứng.\n\n*(Lưu ý: Đây là thông tin mang tính chất tham khảo y khoa theo dạng câu hỏi lâm sàng. Trong thực tế, việc kê đơn kháng sinh cho phụ nữ mang thai luôn phải tuân theo chỉ định trực tiếp của bác sĩ sản khoa sau khi có kết quả tổng phân tích nước tiểu hoặc cấy nước tiểu).*",
+      "explanation": null,
+      "confidence": null,
+      "retrieved_docs": null,
+      "verifier_verdict": null,
+      "timestamp": 1785316901.525743
+    },
+    {
+      "turn_id": 2,
+      "question": "How about if the patient has heart problem too?",
+      "answer": "Chào bạn, việc thai phụ có thêm **bệnh lý tim mạch** sẽ làm cho tình trạng này trở nên phức tạp hơn, đòi hỏi sự phối hợp chặt chẽ giữa bác sĩ sản khoa và bác sĩ tim mạch (hoặc nội khoa). \n\nTuy nhiên, khi phân tích từng khía cạnh cụ thể, việc xử trí sẽ có những điểm cần lưu ý sau:\n\n### 1. Về việc lựa chọn kháng sinh (Nitrofurantoin)\n* **Nitrofurantoin** vẫn là lựa chọn hàng đầu để điều trị viêm bàng quang ở thai phụ (ở tuổi thai 22 tuần). \n* Thuốc này **không có chống chỉ định trực tiếp đối với các bệnh lý tim mạch thông thường**. Nó không gây ảnh hưởng lớn đến huyết áp, nhịp tim hay chức năng bơm máu của tim. \n* *Ngoại lệ:* Nếu bệnh nhân có **suy thận nặng** (do tim mạch ảnh hưởng đến thận), Nitrofurantoin sẽ không được khuyến cáo vì thuốc tích lũy và gây độc tính thần kinh/máu. Do đó, chức năng thận của bệnh nhân cần được kiểm tra.\n\n### 2. Những thách thức khi thai phụ vừa mang thai, vừa nhiễm trùng tiểu, lại có bệnh tim:\n* **Nguy cơ quá tải dịch (Fluid Overload):** \n  * Bình thường, khi bị nhiễm trùng tiểu, bác sĩ thường khuyên uống nhiều nước để làm loãng vi khuẩn. \n  * Nhưng đối với bệnh nhân có bệnh tim (đặc biệt là suy tim hoặc bệnh tim bẩm sinh), việc **tăng lượng nước đột ngột có thể làm tim quá tải**, dẫn đến khó thở, phù phổi cấp. Do đó, lượng nước uống vào phải được bác sĩ tim mạch/sản khoa tính toán cẩn thận, không áp dụng lời khuyên \"uống nhiều nước\" một cách máy móc.\n* **Nguy cơ từ tình trạng nhiễm trùng:**\n  * Bất kỳ một đợt nhiễm trùng nào (dù là nhiễm trùng tiểu nhẹ) cũng làm cơ thể tăng chuyển hóa, tăng nhịp tim và tăng cung lượng tim để chống lại nhiễm trùng. \n  * Đối với một trái tim đã có bệnh lý sẵn, gánh nặng này có thể làm nặng thêm tình trạng bệnh tim (dễ dẫn đến suy tim hoặc rối loạn nhịp tim). Do đó, việc **điều trị dứt điểm nhiễm trùng tiểu bằng kháng sinh phù hợp là cực kỳ quan trọng** để giảm gánh nặng cho tim.\n* **Theo dõi sát sao:** \n  * Bệnh nhân cần được theo dõi các dấu hiệu sinh tồn cẩn thận hơn (nhịp tim, huyết áp, nhịp thở) để phát hiện sớm các dấu hiệu suy tim hoặc sốc nhiễm trùng (nếu nhiễm trùng tiến triển nặng hơn).\n\n### Tóm lại:\nNếu bệnh nhân có thêm bệnh tim:\n1. Về cơ bản, **Nitrofurantoin vẫn có thể dùng được** nếu chức năng thận bình thường.\n2. Tuy nhiên, bệnh nhân **tuyệt đối không tự ý uống nhiều nước** theo các mẹo dân gian nếu chưa có ý kiến của bác sĩ.\n3. Cần được khám và điều trị nội trú hoặc theo dõi sát tại cơ sở y tế có chuyên khoa Sản và Tim mạch để vừa đảm bảo an toàn cho thai nhi, vừa bảo vệ tim của người mẹ.",
+      "explanation": null,
+      "confidence": null,
+      "retrieved_docs": null,
+      "verifier_verdict": null,
+      "timestamp": 1785317049.5909238
+    }
+  ],
+  "current_turn_id": 3,
+  "session_metadata": {
+    "session_start": 1785316878.6253362,
+    "total_questions": 3,
+    "mode": "unlimited"
+  },
+  "config": {
+    "max_turns": null,
+    "max_evidence_per_turn": 3,
+    "mode": "unlimited"
+  }
+}

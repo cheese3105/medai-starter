@@ -1,6 +1,6 @@
-REASONING_MODEL=
-REASONING_MODEL_BASE_URL=
-REASONING_MODEL_API_KEY=
+REASONING_MODEL=gemini-3.5-flash-lite
+REASONING_MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+REASONING_MODEL_API_KEY=AQ.Ab8RN6KpPkX-vQ-qVZVfvg2c70-2pihadDXgwE5HVy9LLI28lw
 
 # --- Optional (v2) - Verifier Agent dùng model/provider riêng ---
 # Không set 3 dòng này -> Verifier tự fallback dùng chung
@@ -22,5 +22,5 @@ RETRIEVAL_CHECK_MODEL_API_KEY=
 # thành viên nghiên cứu RAG: dùng baai/bge-m3 qua OpenRouter làm embedding.
 EMBEDDING_MODEL=baai/bge-m3
 EMBEDDING_MODEL_API_BASE=https://openrouter.ai/api/v1
-EMBEDDING_MODEL_API_KEY=
+EMBEDDING_MODEL_API_KEY=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
 

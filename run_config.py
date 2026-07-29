@@ -46,6 +46,58 @@ class VerifierConfig:
 
 
 @dataclass
+class FollowUpDetectionConfig:
+    method: str = "keyword"  # "keyword" | "semantic"
+    keywords: list = field(default_factory=lambda: [
+        "nó", "cái đó", "ở trên", "trước đó", "điều đó",
+        "it", "this", "that", "above", "previous", "earlier"
+    ])
+
+
+@dataclass
+class ShortTermMemoryConfig:
+    enabled: bool = False
+    max_turns: Optional[int] = None  # None = unlimited, số = sliding window
+    persistence: bool = True
+    session_dir: str = "memory/sessions"
+    auto_load_last_session: bool = True
+    follow_up_detection: FollowUpDetectionConfig = field(default_factory=FollowUpDetectionConfig)
+
+
+@dataclass
+class QACacheConfig:
+    collection_name: str = "qa_cache"
+    chroma_dir: str = "data/chroma"
+    min_confidence: float = 0.8
+    min_verifier_verdict: str = "supported"
+    similarity_threshold: float = 0.85
+    embedding_model: Optional[str] = None
+    max_cache_size: int = 1000
+    cache_eviction_policy: str = "lru"
+
+
+@dataclass
+class AnalyticsConfig:
+    enabled: bool = False
+    db_path: str = "memory/analytics.db"
+    log_all_questions: bool = True
+
+
+@dataclass
+class LongTermMemoryConfig:
+    enabled: bool = False
+    qa_cache: QACacheConfig = field(default_factory=QACacheConfig)
+    analytics: AnalyticsConfig = field(default_factory=AnalyticsConfig)
+
+
+@dataclass
+class MemoryConfig:
+    debug: bool = False
+    short_term: ShortTermMemoryConfig = field(default_factory=ShortTermMemoryConfig)
+    long_term: LongTermMemoryConfig = field(default_factory=LongTermMemoryConfig)
+
+
+@dataclass
 class PricingConfig:
     """Để trống (null) nếu chưa rõ giá - estimated_cost sẽ trả về None."""
     input_per_1k: Optional[float] = None
@@ -63,6 +115,7 @@ class RunConfig:
     retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
     verifier: VerifierConfig = field(default_factory=VerifierConfig)
     pricing: PricingConfig = field(default_factory=PricingConfig)
+    memory: MemoryConfig = field(default_factory=MemoryConfig)
     debug: bool = False
 
     def to_dict(self) -> dict:
@@ -95,6 +148,31 @@ def load_run_config(path: str) -> RunConfig:
         verifier_raw["model"] = env_verifier_model
     verifier_config = VerifierConfig(**verifier_raw)
 
+    # Parse memory config (v3)
+    memory_raw = raw.get("memory", {})
+
+    # Short-term memory
+    stm_raw = memory_raw.get("short_term", {})
+    follow_up_raw = stm_raw.pop("follow_up_detection", {})
+    follow_up_config = FollowUpDetectionConfig(**follow_up_raw)
+    stm_config = ShortTermMemoryConfig(**stm_raw, follow_up_detection=follow_up_config)
+
+    # Long-term memory
+    ltm_raw = memory_raw.get("long_term", {})
+    qa_cache_config = QACacheConfig(**ltm_raw.get("qa_cache", {}))
+    analytics_config = AnalyticsConfig(**ltm_raw.get("analytics", {}))
+    ltm_config = LongTermMemoryConfig(
+        enabled=ltm_raw.get("enabled", False),
+        qa_cache=qa_cache_config,
+        analytics=analytics_config
+    )
+
+    memory_config = MemoryConfig(
+        debug=memory_raw.get("debug", False),
+        short_term=stm_config,
+        long_term=ltm_config
+    )
+
     return RunConfig(
         variant=raw["variant"],
         model=model_name,
@@ -105,5 +183,6 @@ def load_run_config(path: str) -> RunConfig:
         retrieval=retrieval_config,
         verifier=verifier_config,
         pricing=PricingConfig(**raw.get("pricing", {})),
+        memory=memory_config,
         debug=raw.get("debug", False),
     )

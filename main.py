@@ -46,7 +46,16 @@ def main():
 
     elif args.mode == "chat":
         config_path = args.config or "configs/v0.yaml"
-        from modes.chat import run_chat
+
+        # Load config to check if memory is enabled
+        from run_config import load_run_config
+        config = load_run_config(config_path)
+
+        # Use chat_v3 if memory enabled, otherwise use original chat
+        if hasattr(config, 'memory') and config.memory.short_term.enabled:
+            from modes.chat_v3 import run_chat
+        else:
+            from modes.chat import run_chat
 
         run_chat(config_path=config_path)
 

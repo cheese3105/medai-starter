@@ -1,0 +1,36 @@
+{
+  "session_id": "20260729_155541",
+  "turns": [
+    {
+      "turn_id": 0,
+      "question": "bệnh trĩ là gì",
+      "answer": "**Bệnh trĩ** (dân gian gọi là lòi dom) xảy ra khi các tĩnh mạch ở vùng hậu môn và trực trực tràng bị sưng phồng và viêm do áp lực lớn (như rặn khi đi vệ sinh, táo bón kéo dài, mang thai, hoặc ngồi lâu).\n\n**Có 2 loại chính:**\n*   **Trĩ nội:** Nằm bên trong trực tràng (thường không đau nhưng hay chảy máu khi đi ngoài).\n*   **Trĩ ngoại:** Nằm dưới da quanh hậu môn (gây đau rát, ngứa, hoặc sưng cục).\n\n**Hướng xử lý chung tại nhà:**\n*   Ăn nhiều chất xơ (rau xanh, trái cây) và uống nhiều nước để tránh táo bón.\n*   Ngâm hậu môn trong nước ấm 10-15 phút mỗi ngày (2-3 lần).\n*   Tránh ngồi hoặc đứng quá lâu; không rặn mạnh khi đi vệ sinh.\n*   Có thể dùng thuốc bôi hoặc thuốc đặt không kê đơn để giảm đau, giảm viêm tạm thời.\n\n⚠️ **Lưu ý:** *Thông tin trên chỉ mang tính chất tham khảo, không phải chẩn đoán y khoa.* Bạn nên đi khám bác sĩ chuyên khoa Tiêu hóa - Hậu môn để được chẩn đoán chính xác, nhất là khi có các triệu chứng nặng, đau dữ dội, chảy máu nhiều hoặc kéo dài.",
+      "explanation": null,
+      "confidence": null,
+      "retrieved_docs": null,
+      "verifier_verdict": null,
+      "timestamp": 1785315798.5642896
+    },
+    {
+      "turn_id": 1,
+      "question": "nó thường xuất hiện ở dộ tuổi nào",
+      "answer": "Bệnh trĩ có thể xuất hiện ở **mọi độ tuổi**, kể cả trẻ em, nhưng phổ biến nhất là ở người trưởng thành trong độ tuổi từ **45 đến 65 tuổi**. \n\nTuy nhiên, xu hướng mắc bệnh đang **trẻ hóa** do lối sống hiện đại. Dưới đây là các nhóm độ tuổi thường gặp và nguyên nhân:\n\n1. **Người trẻ tuổi (20 - 40 tuổi):** \n   * **Nguyên nhân:** Thường gặp ở nhân viên văn phòng, tài xế (những người phải ngồi lâu một chỗ), người ít vận động, chế độ ăn thiếu chất xơ (ít rau xanh, uống ít nước), hay ăn đồ cay nóng, uống rượu bia, hoặc thường xuyên bị táo bón.\n   * **Phụ nữ mang thai và sau sinh:** Đây là thời kỳ rất dễ bị trĩ (hoặc làm nặng thêm bệnh trĩ sẵn có) do áp lực từ thai nhi chèn ép vùng chậu và sự thay đổi nội tiết tố, cộng thêm việc rặn khi sinh.\n\n2. **Người trung niên và cao tuổi (trên 50 tuổi):**\n   * **Nguyên nhân:** Càng lớn tuổi, các mô nâng đỡ các tĩnh mạch ở hậu môn và trực tràng bắt đầu suy yếu, giãn ra và dễ bị sa xuống. Ngoài ra, người cao tuổi thường hay gặp tình trạng táo bón mãn tính và ít vận động hơn.\n\nTóm lại, dù người lớn tuổi có tỷ lệ mắc cao hơn do quá trình lão hóa tự nhiên, nhưng **bệnh trĩ ngày nay rất phổ biến ở người trẻ** do thói quen sinh hoạt và công việc. \n\n*💡 Lưu ý: Nếu bạn hoặc người thân đang ở độ tuổi nào mà có các triệu chứng như chảy máu khi đi đại cọc, đau rát hay thấy búi trĩ sa ra ngoài, nên chú ý điều chỉnh lại chế độ ăn uống, sinh hoạt và đi khám bác sĩ sớm nhé.*",
+      "explanation": null,
+      "confidence": null,
+      "retrieved_docs": null,
+      "verifier_verdict": null,
+      "timestamp": 1785316133.3492956
+    }
+  ],
+  "current_turn_id": 2,
+  "session_metadata": {
+    "session_start": 1785315798.5642877,
+    "total_questions": 2,
+    "mode": "unlimited"
+  },
+  "config": {
+    "max_turns": null,
+    "max_evidence_per_turn": 3,
+    "mode": "unlimited"
+  }
+}

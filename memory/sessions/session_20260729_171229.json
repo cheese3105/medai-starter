@@ -1,0 +1,48 @@
+{
+  "session_id": "20260729_171229",
+  "turns": [
+    {
+      "turn_id": 0,
+      "question": "A 23-year-old pregnant woman at 22 weeks gestation presents with burning upon urination. She states it started 1 day ago and has been worsening despite drinking more water and taking cranberry extract. She otherwise feels well and is followed by a doctor for her pregnancy. Her temperature is 97.7°F (36.5°C), blood pressure is 122/77 mmHg, pulse is 80/min, respirations are 19/min, and oxygen saturation is 98% on room air. Physical exam is notable for an absence of costovertebral angle tenderness and a gravid uterus. Which of the following is the best treatment for this patient? Choose 1 in following answers below \"Ampicillin\", \"Ceftriaxone\", \"Doxycycline\", \"Nitrofurantoin\"",
+      "answer": "Based on the clinical presentation, this pregnant patient has acute cystitis (lower urinary tract infection) without systemic symptoms or pyelonephritis (normal temperature, absence of costovertebral angle tenderness). Ampicillin, cephalosporins, and nitrofurantoin are considered safe and effective options for treating urinary tract infections in pregnancy. However, ampicillin and cephalosporins are often preferred as first-line options for uncomplicated UTIs, or nitrofurantoin can be utilized. Reviewing the standard options provided, ampicillin is a classic choice for UTI treatment during pregnancy, though nitrofurantoin and cephalosporins are also widely used. Please consult your doctor for persistent symptoms or guidance on the most appropriate medication regimen.\n\nNote: As a medical fact-checker, please note that treatment choices for urinary tract infections during pregnancy should be carefully tailored by a healthcare provider based on local resistance patterns and patient history.",
+      "explanation": "[1], [2], [4]",
+      "confidence": 0.6,
+      "retrieved_docs": [
+        {
+          "text": "Obstentrics_Williams. For recurrent bacteriuria, we have had success with nitrofurantoin, 100 mg orally at bedtime for 21 days (Lucas, 1994). For women with persistent or frequent bacteriuria recurrences, suppressive therapy for the remainder of pregnancy can be given. We routinely use nitrofurantoin, 100 mg orally at bedtime. This drug may rarely cause an acute pulmonary reaction that dissipates on its withdrawal (Boggess, 1996). TABLE 53-1. Oral Antimicrobial Agents Used for Treatment of Pregnant Women with Asymptomatic Bacteriuria Amoxicillin,n3 9 Ampicillin,n2 9 Cephalosporin, 2 9 Nitrofurantoin, 200 mg Trimethoprim-sulfamethoxazole, 320/1600 mg Amoxicillin, 500 mg three times daily Ampicillin, 250 mg four times daily Cephalosporin, 250 mg four times daily Ciprofloxacin, 250 mg twice daily Levofloxacin, 250 or 500 mg daily Nitrofurantoin, 50 to 100 mg four times daily or 100 mg twice daily Trimethoprim-sulfamethoxazole, 160/800 mg twice daily",
+          "title": "Obstentrics_Williams",
+          "source": "MedRAG/textbooks",
+          "chunk_id": "Obstentrics_Williams_7282",
+          "score": 0.6554866433143616
+        },
+        {
+          "text": "InternalMed_Harrison. Nitrofurantoin, ampicillin, and the cephalosporins are considered relatively safe in early pregnancy. One retrospective case-control study suggesting an association between nitrofurantoin and birth defects has not been confirmed. Sulfonamides should clearly be avoided both in the first trimester (because of possible teratogenic effects) and near term (because of a possible role in the development of kernicterus). Fluoroquinolones are avoided because of possible adverse effects on fetal cartilage development. Ampicillin and the cephalosporins have been used extensively in pregnancy and are the drugs of choice for the treatment of asymptomatic or symptomatic UTI in this group of patients. For pregnant women with overt pyelonephritis, parenteral β-lactam therapy with or without aminoglycosides is the standard of care.",
+          "title": "InternalMed_Harrison",
+          "source": "MedRAG/textbooks",
+          "chunk_id": "InternalMed_Harrison_10727",
+          "score": 0.6800498962402344
+        },
+        {
+          "text": "Pediatrics_Nelson. next-step treatments include high-dose amoxicillin-clavulanate (amoxicillin 80 to 90 mg/kg/day), cefuroxime axetil, cefdinir, or ceftriaxone (50 mg/kg intramuscularly in daily doses for 1 to 3 days). Intramuscular ceftriaxone is especially appropriate for children younger than 3 years of age with vomiting that precludes oral treatment. Tympanocentesis may be required for patients who are difficult to treat or who do not respond to therapy. Acetaminophen and ibuprofen are recommended for fever. Decongestants or antihistamines are not effective.",
+          "title": "Pediatrics_Nelson",
+          "source": "MedRAG/textbooks",
+          "chunk_id": "Pediatrics_Nelson_2283",
+          "score": 0.6942070722579956
+        }
+      ],
+      "verifier_verdict": "partial",
+      "timestamp": 1785319970.3529174
+    }
+  ],
+  "current_turn_id": 1,
+  "session_metadata": {
+    "session_start": 1785319970.3529088,
+    "total_questions": 1,
+    "mode": "unlimited"
+  },
+  "config": {
+    "max_turns": null,
+    "max_evidence_per_turn": 3,
+    "mode": "unlimited"
+  }
+}
