@@ -113,6 +113,11 @@ medai/
    # QUERY_REWRITER_MODEL_BASE_URL=http://localhost:11434/v1
    # QUERY_REWRITER_MODEL_API_KEY=dummy
    ```
+4. **Tải dữ liệu ChromaDB cho RAG**:
+Cơ sở dữ liệu ChromaDB đã được ingest sẵn: https://drive.google.com/file/d/1pIQYQ7CHJPbWqNW07kff5XA3YS8ER_Bb/view?usp=sharing
+
+Giải nén file zip dữ liệu đã xây dựng sẵn
+Copy đường dẫn `data/chroma/...` bỏ vào `medai/data/chroma/...`
 
 ---
 
