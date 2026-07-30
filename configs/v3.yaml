@@ -1,6 +1,6 @@
-# V2 — Multi-agent: retrieval + reasoning + verifier với autonomous loop
-# CỐ Ý không có memory — để so sánh với V3 (có memory)
-variant: "v2"
+# V3 — V2 + Memory: STM loop-scratchpad giúp tránh lặp vòng vô ích,
+# LTM read_only chứa reflection từ train split
+variant: "v3"
 debug: "off"
 seed: null
 
@@ -17,7 +17,11 @@ pipeline:
     prompt_template: |
       Answer this medical question using the provided evidence. Choose ONE best answer.
 
+      Previous attempts (learn from these, do NOT repeat the same mistakes):
       {loop_history}
+
+      Lessons from similar questions:
+      {ltm_facts}
 
       Evidence:
       {evidence}
@@ -53,6 +57,9 @@ pipeline:
       Evidence:
       {evidence}
 
+      Known facts about user:
+      {ltm_facts}
+
       Evaluate whether the evidence supports the draft answer.
       If NOT supported, suggest a better search query.
 
@@ -66,8 +73,16 @@ pipeline:
       }}
 
 memory:
-  short_term: { enabled: false }   # V2 cố ý KHÔNG có memory
-  long_term: { enabled: false }
+  short_term:
+    enabled: true
+    scope: "loop"            # benchmark chỉ cần loop-scratchpad
+    max_items: 10
+
+  long_term:
+    enabled: true
+    top_k: 3
+    mode: "read_only"          # benchmark LUÔN read_only (runner cũng enforce)
+    collection_name: "reflections"
 
 pricing:
   input_per_1k: null

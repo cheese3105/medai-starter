@@ -1,0 +1,83 @@
+# V3-chat — Chat mode với đầy đủ STM + LTM
+variant: "v3-chat"
+debug: "verbose"
+seed: null
+
+pipeline:
+  - name: retrieval
+    enabled: true
+    top_k: 5
+    chroma_dir: "data/chroma/medrag_textbooks_bge_m3_openrouter"           # đổi thành path thật nếu collection nằm chỗ khác
+    collection_name: "medrag_textbooks"  # đổi thành tên collection thật của bạn
+
+  - name: reasoning
+    enabled: true
+    temperature: 0.2
+    prompt_template: |
+      Bạn là trợ lý y tế AI. Trả lời bằng tiếng Việt, ngắn gọn, dễ hiểu.
+
+      Lịch sử hội thoại:
+      {stm_history}
+
+      Thông tin đã biết về người dùng:
+      {ltm_facts}
+
+      Quá trình suy luận trước đó:
+      {loop_history}
+
+      Evidence y khoa:
+      {evidence}
+
+      Câu hỏi hiện tại:
+      {question}
+
+      Trả lời tự nhiên, LUÔN nhắc người dùng nên đi khám bác sĩ nếu triệu chứng nặng.
+      Return JSON:
+      {{
+        "answer": "câu trả lời tự nhiên",
+        "explanation": "giải thích",
+        "confidence": 0.0 to 1.0
+      }}
+
+  - name: verifier
+    enabled: true
+    max_iterations: 2
+    prompt_template: |
+      Bạn là verifier y tế. Kiểm tra câu trả lời có được evidence hỗ trợ không.
+
+      Câu hỏi: {question}
+      Draft answer: {draft_answer}
+      Draft explanation: {draft_explanation}
+      Evidence: {evidence}
+      Thông tin người dùng: {ltm_facts}
+
+      Nếu có xung đột giữa câu trả lời và thông tin đã biết về người dùng
+      (VD: đề xuất thuốc mà người dùng dị ứng), PHẢI cảnh báo.
+
+      Return JSON:
+      {{
+        "verdict": "supported or unsupported",
+        "final_answer": "câu trả lời đã sửa (hoặc giữ nguyên nếu supported)",
+        "confidence": 0.0 to 1.0,
+        "explanation": "lý do",
+        "suggested_query": ""
+      }}
+
+memory:
+  short_term:
+    enabled: true
+    scope: "both"
+    max_items: 10
+    max_turns: 6
+
+  long_term:
+    enabled: true
+    top_k: 3
+    mode: "read_write"
+    collection_name: "user_memory"
+    user_id: "default_user"
+    write_after_answer: true
+
+pricing:
+  input_per_1k: null
+  output_per_1k: null

@@ -1,15 +1,14 @@
-# V2 — Multi-agent: retrieval + reasoning + verifier với autonomous loop
-# CỐ Ý không có memory — để so sánh với V3 (có memory)
-variant: "v2"
-debug: "off"
+# V2 + Query Rewriter — so sánh trực tiếp với v2.yaml (không có rewriter)
+variant: "v2-qr"
+debug: "info"
 seed: null
 
 pipeline:
   - name: retrieval
     enabled: true
     top_k: 5
-    chroma_dir: "data/chroma/medrag_textbooks_bge_m3_openrouter"           # đổi thành path thật nếu collection nằm chỗ khác
-    collection_name: "medrag_textbooks"  # đổi thành tên collection thật của bạn
+    chroma_dir: "data/chroma/medrag_textbooks_bge_m3_openrouter"
+    collection_name: "medrag_textbooks"
 
   - name: reasoning
     enabled: true
@@ -41,32 +40,41 @@ pipeline:
     prompt_template: |
       You are a medical answer verifier. Check if the draft answer is supported by the evidence.
 
-      Question:
-      {question}
-
-      Choices:
-      {choices}
-
+      Question: {question}
+      Choices: {choices}
       Draft answer: {draft_answer}
       Draft explanation: {draft_explanation}
-
-      Evidence:
-      {evidence}
-
-      Evaluate whether the evidence supports the draft answer.
-      If NOT supported, suggest a better search query.
+      Evidence: {evidence}
 
       Return JSON only:
       {{
         "verdict": "supported or unsupported",
         "final_answer": "A or B or C or D",
         "confidence": 0.0 to 1.0,
-        "explanation": "why supported or not",
-        "suggested_query": "new search query if unsupported, else empty string"
+        "explanation": "why supported or not"
+      }}
+
+  - name: query_rewriter
+    enabled: true
+    prompt_template: |
+      You are a search query optimizer for a medical evidence retrieval system.
+
+      Original question: {question}
+      Evidence retrieved so far (was NOT sufficient): {evidence}
+      Why the previous answer was rejected: {draft_explanation}
+      Previous attempts: {loop_history}
+
+      Write ONE improved, specific search query that targets the missing
+      medical knowledge. Do NOT repeat the original question verbatim.
+
+      Return JSON only:
+      {{
+        "rewritten_query": "your improved search query",
+        "reasoning": "brief reason for this query"
       }}
 
 memory:
-  short_term: { enabled: false }   # V2 cố ý KHÔNG có memory
+  short_term: { enabled: false }
   long_term: { enabled: false }
 
 pricing:

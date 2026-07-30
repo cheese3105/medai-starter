@@ -1,165 +1,181 @@
-"""Mode 1 - Benchmark.
+"""Benchmark mode — chạy MedQA-USMLE qua pipeline, ghi predictions JSONL."""
 
-Sinh prediction cho MedQA-USMLE-4-options, lưu ra
-predictions_{variant}_{split}.jsonl.
+from __future__ import annotations
 
-Nguyên tắc bắt buộc:
-1. KHÔNG tự tính accuracy/metric ở đây - việc chấm điểm giao hết cho
-   evaluate.py (riêng, join predictions với gold_{split}.jsonl theo
-   question_id).
-2. KHÔNG đưa gold answer (answer_idx) vào bất kỳ đâu trong pipeline sinh
-   câu trả lời - gold answer chỉ ghi riêng ra gold_{split}.jsonl.
-3. Schema predictions.jsonl giống hệt nhau cho mọi variant (V0-V4) - các
-   field nếu chưa dùng (retrieved_docs, agent_trace) vẫn có mặt, giá trị
-   null.
-4. dataset GBaker/MedQA-USMLE-4-options chỉ có 2 split (train, test,
-   không có "dev") - dùng split="train" kèm --limit để debug nhanh, chỉ
-   chạy split="test" đầy đủ 1 lần khi config đã khoá.
-"""
-
-import json
 import time
-from pathlib import Path
 
-from datasets import load_dataset
-
-from graph import build_graph
-from run_config import load_run_config
+from core.config import RunConfig
+from core.logger import DebugLogger, PredictionWriter, make_output_path
+from core.runner import Runner
+from core.types import EpisodeInput
 
 LABELS = ["A", "B", "C", "D"]
+OUTPUT_DIR = "output"
 
 
-def _to_agent_input(row: dict, question_id: str) -> dict:
-    """Adapter: dataset -> AgentState. KHÔNG đưa answer_idx vào đây."""
-    return {
-        "question_id": question_id,
-        "question": row["question"],
-        "choices": [row["options"][label] for label in LABELS],
-        "answer": None,
-        "explanation": None,
-        "confidence": None,
-        "raw_output": None,
-        "latency_ms": None,
-        "token_usage": None,
-        "estimated_cost": None,
-        "retrieved_docs": None,
-        "agent_trace": None,
-        "query_history": None,
-        "retrieval_iterations": None,
-        "retrieval_sufficiency": None,
-        "verifier_verdict": None,
-        "verifier_support_score": None,
-        "verifier_notes": None,
-        "retrieval_latency_ms": None,
-        "retrieval_token_usage": None,
-        "reasoning_latency_ms": None,
-        "reasoning_token_usage": None,
-        "verifier_latency_ms": None,
-        "verifier_token_usage": None,
-    }
+def _load_dataset(split: str, limit: int | None = None):
+    from datasets import load_dataset
+    ds = load_dataset("GBaker/MedQA-USMLE-4-options", split=split)
+    if limit is not None and limit > 0:
+        ds = ds.select(range(min(limit, len(ds))))
+    return ds
 
 
-def run_benchmark(config_path: str, split: str = "test", limit: int | None = None) -> None:
-    run_config = load_run_config(config_path)
+def _row_to_episode(row: dict, index: int, split: str) -> EpisodeInput | None:
+    question = row.get("question")
+    options = row.get("options")
+    answer_idx = row.get("answer_idx")
+    if not question or not options:
+        return None
+    for label in LABELS:
+        if label not in options:
+            return None
+    choices = [options[label] for label in LABELS]
+    return EpisodeInput(
+        question_id=f"{split}_{index:05d}",
+        question=question, choices=choices, gold_answer=answer_idx,
+    )
 
-    print(f"Variant: {run_config.variant} | Split: {split}")
-    print(f"  - Reasoning Agent: {run_config.model}")
-    if run_config.retrieval.enabled:
-        retrieval_model = run_config.retrieval.check_model or run_config.model
-        print(f"  - Retrieval Agent: {retrieval_model} (Self-check loops: max_iterations={run_config.retrieval.max_iterations})")
-    else:
-        print(f"  - Retrieval Agent: Disabled")
-    if run_config.verifier.enabled:
-        verifier_model = run_config.verifier.model or run_config.model
-        print(f"  - Verifier Agent:  {verifier_model} (Mode: {run_config.verifier.mode})")
-    else:
-        print(f"  - Verifier Agent:   Disabled")
 
-    if split == "test" and limit is None:
-        print(
-            "⚠️  Đang chạy FULL test set (1273 câu) - đảm bảo config đã "
-            "\"khoá\" trước khi chạy chính thức (nguyên tắc #4)."
-        )
+def _model_summary(config: RunConfig) -> str:
+    """Liệt kê agent → model, chỉ hiển thị agent đang enabled."""
+    entries = []
+    for s in config.pipeline:
+        if not s.enabled:
+            continue
+        if s.name == "reasoning":
+            entries.append(f"reasoning: {config.model}")
+        elif s.name == "verifier":
+            entries.append(f"verifier: {config.verifier_model}")
+        elif s.name == "query_rewriter":
+            entries.append(f"query_rewriter: {config.query_rewriter_model}")
+        elif s.name == "retrieval":
+            entries.append(f"retrieval: {config.embedding_model or '(embedding)'}")
+    return ", ".join(entries)
 
-    dataset = load_dataset("GBaker/MedQA-USMLE-4-options", split=split)
-    if limit is not None:
-        dataset = dataset.select(range(min(limit, len(dataset))))
-    print(f"Số câu hỏi: {len(dataset)}")
 
-    app = build_graph(run_config)
+def _pipeline_summary(config: RunConfig) -> str:
+    parts = []
+    for s in config.pipeline:
+        if not s.enabled:
+            continue
+        if s.name == "retrieval":
+            parts.append(f"retrieval(top_k={s.top_k})")
+        elif s.name == "verifier":
+            parts.append(f"verifier(max_iterations={s.max_iterations})")
+        else:
+            parts.append(s.name)
+    return " -> ".join(parts) if parts else "(rỗng)"
+
+
+def _memory_summary(config: RunConfig) -> str:
+    parts = []
+    if config.memory.short_term.enabled:
+        parts.append(f"STM(scope={config.memory.short_term.scope})")
+    if config.memory.long_term.enabled:
+        parts.append(f"LTM(mode={config.memory.long_term.mode})")
+    return " + ".join(parts) if parts else "OFF"
+
+
+def run_benchmark(
+    config: RunConfig,
+    split: str = "test",
+    limit: int | None = None,
+    output_path: str | None = None,
+) -> dict:
+    logger = DebugLogger(level=config.debug)
+
+    if config.memory.long_term.enabled:
+        config.memory.long_term.mode = "read_only"
+        config.memory.long_term.write_after_answer = False
+        logger.info("LTM mode ép về read_only cho benchmark")
 
     timestamp = int(time.time())
-    run_dir_name = f"{run_config.variant}_{split}_{timestamp}"
-    run_dir = Path("output") / run_dir_name
-    run_dir.mkdir(parents=True, exist_ok=True)
+    if output_path is None:
+        output_path = make_output_path(OUTPUT_DIR, config.variant, "predictions", timestamp)
 
-    pred_path = run_dir / f"predictions_{run_config.variant}_{split}_{timestamp}.jsonl"
-    gold_path = run_dir / f"gold_{split}_{timestamp}.jsonl"
-    config_out_path = run_dir / f"run_config_{run_config.variant}_{split}_{timestamp}.jsonl"
-    gold_already_exists = gold_path.exists()
+    trace_path = None
+    if config.is_verbose:
+        trace_path = make_output_path(OUTPUT_DIR, config.variant, "trace", timestamp)
+        logger = DebugLogger(level=config.debug, trace_path=trace_path)
 
-    # run_config lưu 1 lần/file riêng (dạng jsonl)
-    with open(config_out_path, "w", encoding="utf-8") as f:
-        f.write(
-            json.dumps(
-                {**run_config.to_dict(), "split": split, "num_questions": len(dataset)},
-                ensure_ascii=False,
-            )
-            + "\n"
-        )
+    model_info = _model_summary(config)
 
-    with open(pred_path, "w", encoding="utf-8") as pred_f, \
-            open(gold_path, "a" if gold_already_exists else "w", encoding="utf-8") as gold_f:
+    runner = Runner(config, logger)
+    writer = PredictionWriter(output_path)
+    writer.write_header({
+        "variant": config.variant,
+        "generated_at": timestamp,
+        "models": model_info,
+        "split": split,
+        "limit": limit,
+        "pipeline_summary": _pipeline_summary(config),
+        "memory_summary": _memory_summary(config),
+    })
 
-        for i, row in enumerate(dataset):
-            question_id = f"{split}_{i}"
-            agent_input = _to_agent_input(row, question_id)
+    logger.info(f"Loading MedQA split={split}" + (f" limit={limit}" if limit else ""))
+    dataset = _load_dataset(split, limit)
+    logger.info(f"Loaded {len(dataset)} questions")
+    if trace_path:
+        logger.info(f"Verbose trace: {trace_path}")
 
-            try:
-                out = app.invoke(agent_input)
-            except Exception as e:  # 1 câu lỗi không được làm sập cả lượt chạy
-                out = {**agent_input, "answer": "INVALID", "raw_output": f"ERROR: {e}"}
+    total, correct, skipped = 0, 0, 0
 
-            prediction = {
-                "question_id": question_id,
-                "question": out.get("question"),
-                "choices": out.get("choices"),
-                "predicted_answer": out.get("answer"),
-                "explanation": out.get("explanation"),
-                "raw_output": out.get("raw_output"),
-                "latency_ms": out.get("latency_ms"),
-                "token_usage": out.get("token_usage"),
-                "estimated_cost": out.get("estimated_cost"),
-                "retrieved_docs": out.get("retrieved_docs"),
-                "agent_trace": out.get("agent_trace"),
-                "query_history": out.get("query_history"),
-                "retrieval_iterations": out.get("retrieval_iterations"),
-                "retrieval_sufficiency": out.get("retrieval_sufficiency"),
-                "verifier_verdict": out.get("verifier_verdict"),
-                "verifier_support_score": out.get("verifier_support_score"),
-                "verifier_notes": out.get("verifier_notes"),
-                "retrieval_latency_ms": out.get("retrieval_latency_ms"),
-                "retrieval_token_usage": out.get("retrieval_token_usage"),
-                "reasoning_latency_ms": out.get("reasoning_latency_ms"),
-                "reasoning_token_usage": out.get("reasoning_token_usage"),
-                "verifier_latency_ms": out.get("verifier_latency_ms"),
-                "verifier_token_usage": out.get("verifier_token_usage"),
-            }
-            pred_f.write(json.dumps(prediction, ensure_ascii=False) + "\n")
-
-            # Gold answer không phụ thuộc variant -> chỉ cần ghi 1 lần cho mỗi split
-            if not gold_already_exists:
-                gold_f.write(
-                    json.dumps(
-                        {"question_id": question_id, "gold_answer": row["answer_idx"]},
-                        ensure_ascii=False,
-                    )
-                    + "\n"
+    for i, row in enumerate(dataset):
+        episode = _row_to_episode(row, i, split)
+        if episode is None:
+            skipped += 1
+            logger.warn(f"Dòng {i} bị skip do thiếu question/options")
+            continue
+        try:
+            result = runner.run_episode(episode)
+            writer.write(result)
+            total += 1
+            if result.is_correct:
+                correct += 1
+            if not config.is_debug:
+                print(
+                    f"\r  [{total}/{len(dataset)}] acc={correct/total:.1%} "
+                    f"(last: {result.predicted_answer}={'✓' if result.is_correct else '✗'})",
+                    end="", flush=True,
                 )
+        except Exception as e:
+            logger.warn(f"Lỗi câu {episode.question_id}: {e}")
+            skipped += 1
 
-            print(f"[{i + 1}/{len(dataset)}] {question_id} -> {prediction['predicted_answer']}")
+    if not config.is_debug:
+        print()
 
-    print(f"\nĐã lưu predictions: {pred_path}")
-    print(f"Đã lưu run_config:  {config_out_path}")
-    if not gold_already_exists:
-        print(f"Đã lưu gold answers: {gold_path}")
+    accuracy = correct / total if total > 0 else 0
+
+    print(f"\n{'='*50}")
+    print(f"  Variant:  {config.variant}")
+    print(f"  Models:")
+    for s in config.pipeline:
+        if not s.enabled:
+            continue
+        if s.name == "reasoning":
+            print(f"    reasoning:      {config.model}")
+        elif s.name == "verifier":
+            print(f"    verifier:       {config.verifier_model}")
+        elif s.name == "query_rewriter":
+            print(f"    query_rewriter: {config.query_rewriter_model}")
+        elif s.name == "retrieval":
+            print(f"    retrieval:      {config.embedding_model or '(embedding)'}")
+    print(f"  Split:    {split}")
+    print(f"  Total:    {total}")
+    print(f"  Correct:  {correct}")
+    print(f"  Accuracy: {accuracy:.1%}")
+    if skipped:
+        print(f"  Skipped:  {skipped}")
+    print(f"  Output:   {output_path}")
+    if trace_path:
+        print(f"  Trace:    {trace_path}")
+    print(f"{'='*50}")
+
+    return {
+        "variant": config.variant, "models": model_info,
+        "split": split, "total": total, "correct": correct,
+        "accuracy": accuracy, "skipped": skipped,
+        "output_file": output_path, "trace_file": trace_path,
+    }

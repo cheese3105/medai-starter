@@ -1,35 +1,31 @@
-# V0 - Baseline: chỉ Reasoning Agent, không RAG, không Verifier
+# V0 — Baseline: chỉ LLM, không RAG, không Verifier, không Memory
 variant: "v0"
-prompt_version: "v1"    # chỉ là nhãn để log/so sánh - không dùng để tra cứu
-temperature: 0.0
+debug: "off"
 seed: null
 
-# Nội dung prompt thật - sửa trực tiếp ở đây để đổi prompt, không cần sửa code.
-# Bắt buộc giữ nguyên {question} và {choices} (được điền lúc chạy),
-# và giữ nguyên {{ }} quanh phần ví dụ JSON (để .format() không hiểu nhầm).
-prompt_template: |
-  Answer this question:
+pipeline:
+  - name: reasoning
+    enabled: true
+    temperature: 0.0
+    prompt_template: |
+      Answer this medical question. Choose ONE best answer from the given choices.
 
-  Question:
-  {question}
+      Question:
+      {question}
 
-  Choices:
-  {choices}
+      Choices:
+      {choices}
 
-  Answer this question carefully and choose ONE best answer.
-  Only return JSON in the following format, do not add any other text outside the JSON:
-  {{
-    "answer": "A or B or C or D",
-    "explanation": "explanation about the answer",
-    "confidence": confidence from 0 to 1
-  }}
+      Return JSON only:
+      {{
+        "answer": "A or B or C or D",
+        "explanation": "brief explanation",
+        "confidence": 0.0 to 1.0
+      }}
 
-retrieval:
-  enabled: false
-  top_k: 5
-
-verifier:
-  enabled: false
+memory:
+  short_term: { enabled: false }
+  long_term: { enabled: false }
 
 pricing:
   input_per_1k: null

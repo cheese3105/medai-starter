@@ -1,291 +1,302 @@
-# Med-AI Starter (Phiên bản v2 - Multi-agent: Retrieval → Reasoning → Verifier)
+# MED-AI — Framework Đánh Giá & Chat Y Khoa Đa Tầng (V0 - V3)
 
-Đây là mã nguồn khởi đầu cho bài toán **trả lời câu hỏi trắc nghiệm y khoa** (Medical QA), sử dụng tập dữ liệu [MedQA-USMLE-4-options](https://huggingface.co/datasets/GBaker/MedQA-USMLE-4-options).
-
-Phiên bản hiện tại (v2) là một hệ **multi-agent tuần tự 3 bước**:
-- **Retrieval Agent**: truy xuất bằng chứng từ ChromaDB (bge-m3), tự đánh giá evidence đã đủ chưa và có thể tự viết lại truy vấn để tìm thêm.
-- **Reasoning Agent**: suy luận lâm sàng từ evidence, sinh đáp án + giải thích + confidence.
-- **Verifier Agent**: kiểm chứng đáp án có thực sự được evidence hỗ trợ không, rồi chốt đáp án cuối cùng (không tự bịa đáp án khi thiếu bằng chứng).
-
-Cả 3 agent đều bật/tắt độc lập qua file YAML (không sửa code) - v0 và v1 vẫn chạy y hệt như trước.
+MED-AI là một framework thử nghiệm và đánh giá các hệ thống trí tuệ nhân tạo y khoa theo kiến trúc **Modular Pipeline & Multi-Agent**. Hệ thống được thiết kế để đo lường, so sánh hiệu năng qua từng giai đoạn tiến hoá (từ V0 đến V3), hỗ trợ cả chế độ đánh giá tự động (Benchmark trên bộ dữ liệu **MedQA-USMLE**) và chế độ trò chuyện tương tác (Interactive Chat REPL).
 
 ---
 
-## 🧠 Tổng quan luồng xử lý
+## 📌 1. Tiến Trình Tiến Hoá (V0 ➔ V3)
 
-Hệ thống hỗ trợ cấu hình linh hoạt hai luồng xử lý chính thông qua file cấu hình YAML:
+Framework được thiết kế với 4 phiên bản kiến trúc chính:
 
-### 1. Luồng v0 (Baseline - Chỉ suy luận)
-```
-Yêu cầu (câu hỏi + 4 lựa chọn)
-         ↓
-   Reasoning Agent (LLM)
-         ↓
-Kết quả (đáp án A/B/C/D + giải thích + confidence)
-```
-
-### 2. Luồng v1 (RAG - Truy xuất và suy luận)
-```
-Yêu cầu (câu hỏi + 4 lựa chọn)
-         ↓
-  Retrieval Agent (Truy xuất ChromaDB bằng bge-m3)
-         ↓
-Điền evidence vào prompt template
-         ↓
-   Reasoning Agent (LLM)
-         ↓
-Kết quả (đáp án A/B/C/D + giải thích + confidence)
-```
-
-### 3. Luồng v2 (Multi-agent - Retrieval → Reasoning → Verifier)
-```
-Yêu cầu (câu hỏi + 4 lựa chọn)
-         ↓
-  Retrieval Agent ⟲ (truy xuất Chroma, tự đánh giá đủ chưa,
-                      tự viết lại truy vấn nếu chưa đủ - tối đa N vòng)
-         ↓
-   Reasoning Agent (LLM sinh đáp án nháp + giải thích + confidence)
-         ↓
-  Verifier Agent (đối chiếu đáp án với evidence, chốt đáp án cuối,
-                   hạ confidence/gắn cờ nếu không được evidence hỗ trợ)
-         ↓
-Kết quả (đáp án A/B/C/D + giải thích + confidence + verifier_verdict)
-```
-
-`retrieval.max_iterations=1` (mặc định) tắt hoàn toàn vòng tự đánh giá của Retrieval Agent -> luồng v1 chạy y hệt như cũ, không tốn thêm chi phí.
-`verifier.enabled=false` (mặc định) tắt hoàn toàn Verifier Agent -> luồng v0/v1 không đổi.
+- **V0 — Direct LLM Reasoning**:
+  - Mô hình suy luận trực tiếp (Direct Zero-shot / Few-shot Reasoning).
+  - Không truy xuất tài liệu bên ngoài, không kiểm chứng, không bộ nhớ.
+- **V1 — RAG Evidence Retrieval**:
+  - Tích hợp kỹ thuật **Retrieval-Augmented Generation (RAG)**.
+  - Truy xuất các đoạn văn bản/sách giáo khoa y khoa từ **ChromaDB vector store** làm minh chứng (`evidence`) để bổ sung ngữ cảnh trước khi suy luận.
+- **V2 — Self-Correction & Query Rewriting**:
+  - Thêm vòng lặp phản biện (**Verifier Agent**).
+  - Verifier kiểm chứng câu trả lời nháp (`draft_answer`) so với minh chứng.
+  - Nếu câu trả lời chưa vững chắc (`verdict: unsupported`), **Query Rewriter Agent** sẽ viết lại câu hỏi tìm kiếm để truy xuất lại tài liệu mới và lặp lại quá trình cho đến khi đạt yêu cầu hoặc chạm ngưỡng `max_iterations`.
+- **V3 — Memory-Augmented System (STM & LTM)**:
+  - Tích hợp hệ thống **Bộ nhớ ngắn hạn (Short-Term Memory - STM)** cho ngữ cảnh vòng lặp (`loop`) và phiên làm việc (`session`).
+  - Tích hợp **Bộ nhớ dài hạn (Long-Term Memory - LTM)** lưu trữ bền vững trong ChromaDB: tự động trích xuất các thông tin y khoa quan trọng của người dùng (tiền sử bệnh, dị ứng, thuốc đang dùng, v.v.) qua các cuộc hội thoại để cá nhân hoá câu trả lời trong tương lai.
 
 ---
 
-## 🗺️ Cấu trúc thư mục
+## 📁 2. Cấu Trúc Thư Mục Project
 
-```
-medai-starter-with-rag/
-├── main.py                  # Điểm khởi chạy chính (chọn chạy benchmark hoặc chat)
-├── state.py                 # Định nghĩa cấu trúc AgentState đi qua LangGraph
-├── run_config.py            # Đọc cấu hình từ file YAML cấu hình chạy (RunConfig)
-├── llm_client.py            # Khởi tạo LLM client OpenAI-compatible
-├── graph.py                 # Định nghĩa và kết nối luồng xử lý (LangGraph)
-│
-├── agents/
-│   ├── reasoning_agent.py   # Agent suy luận: gọi LLM để đưa ra đáp án nháp
-│   ├── retrieval_agent.py   # Agent truy xuất: tìm bằng chứng + tự đánh giá/truy vấn lại (v2)
-│   └── verifier_agent.py    # Agent kiểm chứng: đối chiếu đáp án với evidence, chốt đáp án (v2)
-│
-├── retrieval/
-│   ├── ingest_data.py       # Pipeline lưu trữ dữ liệu giáo trình vào database Chroma
-│   └── retriever.py         # Tìm kiếm bằng chứng tương đồng từ Chroma index
-│
-├── configs/
-│   ├── v0.yaml              # Cấu hình baseline (không bật RAG)
-│   ├── v1.yaml              # Cấu hình RAG (bật retrieval, k=5)
-│   └── v2.yaml              # Cấu hình multi-agent (retrieval self-retry + verifier)
-│
-├── output/                  # Thư mục lưu kết quả chạy benchmark
-│   ├── predictions_{variant}_{split}.jsonl  # Dự đoán của Agent
-│   ├── gold_{split}.jsonl                    # Đáp án đúng (được tách riêng)
-│   └── run_config_{variant}_{split}.json     # Bản lưu cấu hình của lượt chạy
-└── requirements.txt         # Các thư viện phụ thuộc của dự án
+```text
+medai/
+├── configs/                # Tệp cấu hình thí nghiệm YAML (v0.yaml -> v3-chat.yaml)
+│   ├── v0.yaml             # Config V0 Direct Reasoning
+│   ├── v1.yaml             # Config V1 RAG
+│   ├── v2.yaml / v2-qr.yaml# Config V2 Self-Correction & Query Rewriter
+│   ├── v3.yaml / v3-qr.yaml# Config V3 Benchmark với LTM/STM
+│   └── v3-chat.yaml        # Config V3 dành riêng cho Chat Mode
+├── core/                   # Mô-đun lõi của hệ thống
+│   ├── config.py           # Load & validate cấu hình YAML + biến môi trường .env
+│   ├── llm_client.py       # Khởi tạo LLM client (qua LangChain / OpenAI API)
+│   ├── logger.py           # Logger hệ thống & Ghi nhận kết quả dự đoán JSONL
+│   ├── runner.py           # Controller Loop thực thi pipeline cho mỗi Episode
+│   └── types.py            # Khai báo schema dữ liệu (EpisodeInput, EpisodeResult, StageOutput)
+├── data/                   # Thư mục chứa dữ liệu Vector Store (ChromaDB)
+│   └── chroma/             # Cơ sở dữ liệu vector sách y khoa & LTM
+├── memory/                 # Hệ thống quản lý bộ nhớ
+│   ├── short_term.py       # Session Buffer giữ N lượt hội thoại gần nhất
+│   └── long_term.py        # Quản lý & trích xuất bộ nhớ dài hạn với ChromaDB
+├── modes/                  # Chế độ vận hành chính của ứng dụng
+│   ├── benchmark.py        # Chế độ chạy đánh giá tự động trên MedQA-USMLE
+│   └── chat.py             # Chế độ Chat REPL tương tác trực tiếp
+├── output/                 # Nơi lưu trữ các tệp kết quả dự đoán (.jsonl) và trace log
+├── retrieval/              # Mô-đun truy xuất dữ liệu RAG
+│   └── retriever.py        # Wrapper kết nối ChromaDB & gọi HTTP Embedding API
+├── stages/                 # Các giai đoạn thực thi (Pipeline Stages)
+│   ├── base.py             # Abstract Class định nghĩa Stage
+│   ├── reasoning.py        # Stage suy luận y khoa
+│   ├── retrieval.py        # Stage truy xuất tài liệu
+│   ├── verifier.py         # Stage kiểm chứng & phản biện
+│   └── query_rewriter.py   # Stage viết lại truy vấn tìm kiếm
+├── .env.example            # Tệp mẫu khai báo biến môi trường
+├── main.py                 # CLI Entrypoint chính của ứng dụng
+├── pyrightconfig.json      # Cấu hình type-checking Python
+└── requirements.txt        # Danh sách thư viện phụ thuộc
 ```
 
 ---
 
-## ⚙️ Cài đặt & Cấu hình
+## 🛠️ 3. Hướng Dẫn Cài Đặt (Installation)
 
-### 1. Cài đặt môi trường
+### Yêu cầu hệ thống:
+- **Python**: `>= 3.10`
+- API Key / LLM Endpoint tương thích OpenAI format (Ollama, vLLM, OpenRouter, v.v.)
 
-Chạy các lệnh dưới đây trong terminal (trong môi trường WSL nếu chạy trên Windows):
+### Các bước thực hiện:
 
-```bash
-# 1. Tạo môi trường ảo
-python3 -m venv venv
-source venv/bin/activate
-
-# 2. Cài đặt các thư viện cần thiết
-pip install -r requirements.txt
-```
-
-### 2. Cấu hình file `.env`
-
-Sao chép file cấu hình mẫu và điền thông tin thực tế:
-
-```bash
-cp env-example .env
-```
-
-**Nội dung `.env` cần thiết lập:**
-
-```env
-# Cấu hình mô hình suy luận (Reasoning Model)
-REASONING_MODEL=gemini-3.5-flash-lite                   # Tên mô hình chính sử dụng
-REASONING_MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai  # Endpoint OpenAI-compatible
-REASONING_MODEL_API_KEY=your_reasoning_model_api_key    # API key của mô hình suy luận
-
-# --- Optional (v2) - Tên mô hình riêng và thông tin endpoint cho các Agent phụ ---
-# Set nếu muốn chạy Verifier hoặc Retrieval self-check bằng mô hình/provider riêng biệt.
-# Nếu để trống (hoặc không định nghĩa BASE_URL/API_KEY), hệ thống tự động fallback sử dụng chung REASONING_MODEL.
-VERIFIER_MODEL=gemini-3.5-flash-lite
-VERIFIER_MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-VERIFIER_MODEL_API_KEY=your_verifier_model_api_key
-
-RETRIEVAL_CHECK_MODEL=gemini-3.5-flash-lite
-RETRIEVAL_CHECK_MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
-RETRIEVAL_CHECK_MODEL_API_KEY=your_retrieval_check_model_api_key
-
-# Cấu hình mô hình nhúng (Embedding Model) - Cần thiết cho RAG
-EMBEDDING_MODEL=baai/bge-m3                             # Tên mô hình nhúng
-EMBEDDING_MODEL_API_BASE=https://openrouter.ai/api/v1   # API base của mô hình nhúng
-EMBEDDING_MODEL_API_KEY=your_embedding_api_key          # API key dùng để gọi API nhúng
-```
-
----
-
-## 💾 Xây dựng Vector Database (ChromaDB)
-
-Nếu bạn đã có sẵn thư mục chứa cơ sở dữ liệu ChromaDB tại `data/chroma/...` (ví dụ: được giải nén từ file zip dữ liệu đã xây dựng sẵn), bạn có thể bỏ qua bước này.
-
-Cơ sở dữ liệu ChromaDB đã được ingest sẵn: https://drive.google.com/file/d/1pIQYQ7CHJPbWqNW07kff5XA3YS8ER_Bb/view?usp=sharing
-
-Nếu muốn xây dựng cơ sở dữ liệu từ đầu từ tài liệu thô:
-1. Chuẩn bị file dữ liệu giáo trình tại `data/corpus/medrag_textbooks/textbooks.jsonl`.
-2. Đảm bảo cấu hình `EMBEDDING_MODEL_API_KEY` đã được thiết lập đúng trong `.env`.
-3. Chạy lệnh xây dựng vector database (quá trình này chạy offline và có thể mất vài giờ tùy thuộc kích thước tài liệu):
-
-```bash
-python3 -m retrieval.ingest_data 
-```
-
----
-
-## 🚀 Hướng dẫn chạy chương trình
-
-### Mode 1 — Benchmark (Đánh giá chất lượng hàng loạt)
-
-Benchmark chạy trên dataset MedQA-USMLE-4-options để đánh giá độ chính xác (Accuracy).
-
-```bash
-# Chạy thử nghiệm nhanh: Chạy 20 câu đầu tiên của tập train bằng luồng v0 (Không RAG)
-python3 main.py --mode benchmark --config configs/v0.yaml --split train --limit 20
-
-# Chạy thử nghiệm nhanh bằng luồng v1 (Có RAG)
-python3 main.py --mode benchmark --config configs/v1.yaml --split train --limit 20
-
-# Chạy chính thức: Toàn bộ 1273 câu của tập test (chỉ chạy khi cấu hình đã được khóa)
-python3 main.py --mode benchmark --config configs/v1.yaml --split test
-```
-
-### Mode 2 — Chat (Hỏi đáp tự do)
-
-Chế độ chat trực tiếp trong terminal để tương tác nhanh với mô hình:
-
-```bash
-# Chạy chat với cấu hình mặc định (configs/v0.yaml)
-python3 main.py --mode chat
-
-# Chạy chat với cấu hình bật RAG (configs/v1.yaml)
-python3 main.py --mode chat --config configs/v1.yaml
-```
-
----
-
-## 📂 Dữ liệu đầu ra (Output)
-
-Mỗi lượt chạy benchmark sẽ tự động tạo ra một thư mục riêng trong thư mục `output/` có định dạng `output/{variant}_{split}_{timestamp}/` chứa 3 file kết quả:
-
-| File | Nội dung |
-|---|---|
-| `output/{variant}_{split}_{timestamp}/predictions_{variant}_{split}_{timestamp}.jsonl` | Chứa dự đoán của mô hình: câu hỏi, các lựa chọn, đáp án mô hình chọn (`predicted_answer`), giải thích, độ tin cậy, dữ liệu truy xuất (`retrieved_docs`), chi phí (`estimated_cost`), tổng thời gian / token của cả luồng (`latency_ms`, `token_usage`), và thông số chi tiết của từng agent (`retrieval_latency_ms`, `retrieval_token_usage`, `reasoning_latency_ms`, `reasoning_token_usage`, `verifier_latency_ms`, `verifier_token_usage`). |
-| `output/{variant}_{split}_{timestamp}/gold_{split}_{timestamp}.jsonl` | Đáp án đúng thực tế của bộ câu hỏi. Được lưu riêng để làm cơ sở tính điểm mà không bị rò rỉ vào luồng suy luận. |
-| `output/{variant}_{split}_{timestamp}/run_config_{variant}_{split}_{timestamp}.jsonl` | Bản lưu snapshot cấu hình đầy đủ của lượt chạy (model, prompt template, temperature...) dưới dạng một dòng JSON. |
-
----
-
-## ✏️ Cách chỉnh sửa Prompt và Cấu hình Thử nghiệm
-
-Bạn có thể thay đổi prompt trực tiếp trong các file cấu hình YAML tại thư mục `configs/` mà không cần sửa đổi mã nguồn Python.
-
----
-
-## 🧩 Cấu hình Multi-agent (v2 - Retrieval self-retry + Verifier)
-
-`configs/v2.yaml` bật cả 2 cơ chế mới, độc lập nhau:
-
-```yaml
-debug: true                   # Bật/tắt chế độ in log debug hiển thị quá trình chạy chi tiết của từng agent
-retrieval:
-  enabled: true
-  top_k: 5
-  max_iterations: 2           # >1 -> bật vòng tự đánh giá + truy vấn lại
-  sufficiency_threshold: 0.6  # ngưỡng "đủ evidence" (0-1)
-  check_model: null           # null -> dùng chung model+provider với Reasoning Agent hoặc cấu hình qua RETRIEVAL_CHECK_MODEL trong .env
-  prompt_template: |          # Template prompt tự đánh giá độ đầy đủ của evidence (sửa trực tiếp trong YAML)
-    You are grading whether the retrieved evidence below is...
-    {question} ... {choices} ... {evidence}
-
-verifier:
-  enabled: true
-  mode: "annotate_and_guard"  # xem giải thích bên dưới
-  model: null                 # null -> dùng chung model+provider với Reasoning Agent hoặc cấu hình qua VERIFIER_MODEL trong .env
-  prompt_template: |          # Template prompt kiểm chứng đáp án (sửa trực tiếp trong YAML)
-    You are a careful medical fact-checker...
-```
-
-**Chế độ Debug (`debug: true`)**: khi bật, terminal sẽ in chi tiết câu hỏi đang gửi, agent nào đang xử lý, các vòng truy vấn lại của Retrieval (reformulated query), kết quả đánh giá sufficiency, và kết quả chốt/audit của Verifier.
-
-**Retrieval self-retry (`retrieval.max_iterations`)**: sau khi lấy `top_k` evidence, nếu `max_iterations > 1`, agent gọi thêm 1 lời gọi LLM để tự chấm điểm "evidence đã đủ để trả lời chưa" (`sufficiency_score`). Nếu chưa đủ, agent tự viết lại truy vấn (`next_query`) và tìm lại, tối đa `max_iterations` lần, rồi gộp + khử trùng lặp toàn bộ evidence đã tìm được (giữ lại `top_k` evidence tốt nhất theo điểm tương đồng). Đặt `max_iterations: 1` để tắt hẳn cơ chế này (giống hệt hành vi v1, không tốn thêm chi phí). Bạn có thể chỉnh sửa prompt tự đánh giá trực tiếp qua trường `retrieval.prompt_template`.
-
-**Verifier Agent (`verifier.enabled`)**: chạy sau Reasoning Agent, đối chiếu đáp án nháp với evidence đã truy xuất và trả về `verdict` (`supported`/`partial`/`unsupported`) + `support_score`. Với `mode: "annotate_and_guard"` (mặc định, khuyến nghị cho domain y tế): khi `verdict = unsupported`, Verifier **không được phép** tự đổi sang đáp án khác - chỉ hạ `confidence` xuống tối đa 0.3 và gắn cờ để phục vụ error analysis, tránh việc verifier "tự tin sai" thay vì báo không chắc. Dùng `mode: "annotate_only"` nếu chỉ muốn gắn nhãn/điểm mà không đổi confidence. Bạn có thể chỉnh sửa prompt kiểm chứng trực tiếp qua trường `verifier.prompt_template`.
-
-**Dùng model/provider riêng cho Verifier hoặc Retrieval self-check (`verifier.model` / `retrieval.check_model`)**: mặc định (`null`) cả 2 bước phụ này dùng **chung endpoint + API key** với Reasoning Agent (đọc từ `REASONING_MODEL_BASE_URL`/`REASONING_MODEL_API_KEY`). Muốn verifier/retrieval-check gọi sang **1 provider/mô hình hoàn toàn khác**, bạn có thể cấu hình tên model trực tiếp trong YAML (`check_model` / `model`) hoặc đặt tên biến môi trường trong `.env` (`VERIFIER_MODEL` / `RETRIEVAL_CHECK_MODEL`) kèm base_url và api_key của chúng.
-
-**Các field mới được ghi vào `predictions.jsonl` để phân tích:**
-- **Thông số flow tổng:** `latency_ms` (tổng thời gian toàn bộ luồng), `token_usage` (tổng token tiêu thụ của cả 3 agent), `estimated_cost` (tổng chi phí ước tính).
-- **Thông số chi tiết từng agent:**
-  - **Retrieval:** `retrieval_latency_ms`, `retrieval_token_usage`, `query_history`, `retrieval_iterations`, `retrieval_sufficiency`.
-  - **Reasoning:** `reasoning_latency_ms`, `reasoning_token_usage`.
-  - **Verifier:** `verifier_latency_ms`, `verifier_token_usage`, `verifier_verdict`, `verifier_support_score`, `verifier_notes`.
-
-
-Chạy thử nhanh để so sánh v1 vs v2:
-```bash
-python3 main.py --mode benchmark --config configs/v1.yaml --split train --limit 20
-python3 main.py --mode benchmark --config configs/v2.yaml --split train --limit 20
-```
-
----
-
-## 🔧 Cách tạo biến thể thử nghiệm mới (v3...)
-
-Để thử nghiệm một cấu hình hoặc prompt mới độc lập mà không ảnh hưởng đến các phiên bản cũ:
-
-1. Tạo file cấu hình mới từ file mẫu:
+1. **Tạo môi trường ảo (Virtual Environment) & Kích hoạt**:
    ```bash
-   cp configs/v1.yaml configs/v2.yaml
+   python3 -m venv .venv
+   source .venv/bin/activate        # Trên Linux/macOS
+   # Hoặc trên Windows PowerShell:
+   # .venv\Scripts\Activate.ps1
    ```
-2. Thay đổi giá trị trường `variant` bên trong file cấu hình mới (ví dụ: `variant: "v2"`), điều chỉnh prompt hoặc tham số nhiệt độ (`temperature`).
-3. Chạy benchmark sử dụng file cấu hình mới:
+
+2. **Cài đặt các thư viện phụ thuộc**:
    ```bash
-   python3 main.py --mode benchmark --config configs/v2.yaml --split train --limit 20
+   pip install -r requirements.txt
    ```
-Các file kết quả sẽ được lưu độc lập dưới tên dạng `predictions_v2_...` trong thư mục `output/`.
+
+3. **Cấu hình biến môi trường (`.env`)**:
+   Sao chép tệp mẫu `.env.example` thành `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+   Chỉnh sửa các giá trị trong `.env` phù hợp với mô hình của bạn:
+   ```env
+   # --- Reasoning Model (Bắt buộc) ---
+   REASONING_MODEL=your-model-name
+   REASONING_MODEL_BASE_URL=http://localhost:11434/v1
+   REASONING_MODEL_API_KEY=dummy
+
+   # --- Verifier Model (Tùy chọn, mặc định dùng chung với Reasoning Model) ---
+   # VERIFIER_MODEL=your-verifier-model
+   # VERIFIER_MODEL_BASE_URL=http://localhost:11434/v1
+   # VERIFIER_MODEL_API_KEY=dummy
+
+   # --- Embedding Model (Cần thiết cho V1+ RAG và V3 LTM) ---
+   # EMBEDDING_MODEL=bge-m3
+   # EMBEDDING_MODEL_API_BASE=https://openrouter.ai/api/v1
+   # EMBEDDING_MODEL_API_KEY=your-key
+
+   # --- Query Rewriter Model (Tùy chọn) ---
+   # QUERY_REWRITER_MODEL=your-model
+   # QUERY_REWRITER_MODEL_BASE_URL=http://localhost:11434/v1
+   # QUERY_REWRITER_MODEL_API_KEY=dummy
+   ```
 
 ---
 
-## 🔬 Các nguyên tắc phát triển cốt lõi
+## 🚀 4. Hướng Dẫn Sử Dụng (How to Run)
 
-1. **Không rò rỉ đáp án đúng (No gold leakage):** Tuyệt đối không đưa đáp án đúng (`answer_idx`) vào bất kỳ nút nào trong luồng xử lý hoặc cấu trúc `AgentState`.
-2. **Quản lý cấu hình dạng Snapshot:** Mọi tham số ảnh hưởng tới kết quả kiểm thử phải được lưu kèm trong file cấu hình của lượt chạy để đảm bảo tính tái lập.
-3. **Xử lý lỗi ngoại lệ an toàn:** Lỗi phát sinh từ một câu hỏi đơn lẻ hoặc lỗi kết nối dịch vụ truy xuất (retrieval) không được làm dừng toàn bộ quá trình chạy benchmark.
-4. **Phân tách chấm điểm:** Toàn bộ công việc chấm điểm và thống kê được thực hiện riêng biệt thông qua script đánh giá (ví dụ: `evaluate.py`), dựa trên việc kết hợp file `predictions` và file `gold` thông qua trường `question_id`.
+Ứng dụng chạy thông qua file [main.py](file:///wsl.localhost/Ubuntu/home/cheese00/medai-v0-v3/medai/main.py) với 2 chế độ chính: `--mode benchmark` và `--mode chat`.
+
+### A. Chế Độ Benchmark (Chạy Đánh Giá Tự Động)
+
+Chế độ này tải bộ dữ liệu `GBaker/MedQA-USMLE-4-options` từ HuggingFace Datasets, đưa từng câu hỏi qua Pipeline và tính toán độ chính xác (Accuracy), latency, token usage.
+
+**Cú pháp chung**:
+```bash
+python main.py --mode benchmark --config <duong_dan_file_config> [cac_tham_so_bổ_sung]
+```
+
+**Các tham số CLI tùy chọn**:
+- `--split`: Tập dữ liệu (`test` hoặc `train`, mặc định: `test`).
+- `--limit`: Giới hạn số lượng câu hỏi cần chạy (ví dụ `--limit 20` để test nhanh).
+- `--output`: Đường dẫn tùy chỉnh tệp lưu kết quả `.jsonl` (mặc định lưu tự động vào `output/predictions_<variant>_<timestamp>.jsonl`).
+
+**Các câu lệnh mẫu**:
+
+1. **Chạy V0 (Direct Reasoning)** với 10 câu hỏi test:
+   ```bash
+   python main.py --mode benchmark --config configs/v0.yaml --split test --limit 10
+   ```
+
+2. **Chạy V1 (RAG Evidence Retrieval)**:
+   ```bash
+   python main.py --mode benchmark --config configs/v1.yaml --split test --limit 20
+   ```
+
+3. **Chạy V2 (Self-Correction & Verification)**:
+   ```bash
+   python main.py --mode benchmark --config configs/v2.yaml --split test --limit 20
+   ```
+
+4. **Chạy V2-QR (Verification + Query Rewriter)**:
+   ```bash
+   python main.py --mode benchmark --config configs/v2-qr.yaml --split test --limit 20
+   ```
+
+5. **Chạy V3-QR (Toàn bộ Pipeline + RAG + Verifier + Query Rewriter + LTM Read-Only)**:
+   ```bash
+   python main.py --mode benchmark --config configs/v3-qr.yaml --split test --limit 20
+   ```
 
 ---
 
-## 🗓️ Lộ trình dự án (Roadmap)
+### B. Chế Độ Chat Tương Tác (Interactive Chat REPL)
 
-| Giai đoạn | Trạng thái | Mô tả |
-|---|---|---|
-| **v0 — Baseline** | ✅ Hoàn thành | Luồng suy luận cơ bản: Input → Reasoning Agent → Output |
-| **v1 — Retrieval (RAG)** | ✅ Hoàn thành | Luồng bổ sung tri thức: Input → Retrieval Agent (Chroma DB) → Reasoning Agent → Output |
-| **v2 — Verifier** | ✅ Hoàn thành | Luồng multi-agent: Retrieval Agent (tự đánh giá + truy vấn lại) → Reasoning Agent → Verifier Agent kiểm chứng đáp án bằng evidence trước khi xuất dữ liệu |
-| **v3 — Memory** | ⬜️ Chưa bắt đầu | Thực hiện lưu history của conversation lại để phục vụ cho việc hỏi các câu hỏi tiếp theo |
-| **evaluate.py** | ⬜️ Chưa bắt đầu | Tạo file evaluate.py và run với số lượng dữ liệu lớn để có cơ sở so sánh và đánh giá kết quả chạy từng version |
+Chế độ này mở một giao diện dòng lệnh (REPL) cho phép người dùng trò chuyện trực tiếp với hệ thống y khoa. Hệ thống sẽ áp dụng bộ nhớ ngắn hạn (STM) cho phiên làm việc và tự động lưu/truy xuất thông tin dài hạn (LTM).
+
+**Câu lệnh thực thi**:
+```bash
+python main.py --mode chat --config configs/v3-chat.yaml
+```
+
+**Ví dụ tương tác**:
+```text
+=== MED-AI Chat === (your-model-name | memory: STM(session, 6 turns) + LTM(read_write))
+Nhập 'exit' để thoát.
+
+Câu hỏi: Tôi bị dị ứng với Penicillin và bị hen suyễn từ nhỏ.
+Trả lời: Cảm ơn bạn đã chia sẻ. Tôi đã ghi nhận thông tin bạn bị dị ứng với Penicillin và có tiền sử bệnh hen suyễn...
+
+Câu hỏi: Tôi đang bị đau họng, bác sĩ có thể kê đơn thuốc kháng sinh được không?
+Trả lời: Dựa trên tiền sử dị ứng Penicillin của bạn, chúng ta tuyệt đối không sử dụng nhóm kháng sinh Penicillin...
+```
+
+---
+
+## 🔄 5. Luồng Hoạt Động Của Hệ Thống (System Execution Flow)
+
+Hệ thống hoạt động theo mô hình **Controller Loop** được quản lý trong [core/runner.py](file:///wsl.localhost/Ubuntu/home/cheese00/medai-v0-v3/medai/core/runner.py):
+
+```mermaid
+flowchart TD
+    A[Bắt đầu Episode / Lượt Chat] --> B[Nạp Ngữ Cảnh Bộ Nhớ: STM & LTM]
+    B --> C{Bắt đầu Vòng Lặp Iteration 1..N}
+    C --> D{Retrieval Enabled?}
+    D -- Có --> E[Query Chroma Vector Store -> Lấy Evidence]
+    D -- Không --> F[Reasoning Stage]
+    E --> F
+    F --> G[Tạo Draft Answer + Explanation + Confidence]
+    G --> H{Verifier Enabled?}
+    H -- Không --> Z[Trả về Kết Quả Cuối Cùng]
+    H -- Có --> I[Verifier Stage: Fact-check Draft Answer]
+    I --> J{Verdict == 'supported'?}
+    J -- Supported --> Z
+    J -- Unsupported --> K{Query Rewriter Enabled?}
+    K -- Có --> L[Query Rewriter Stage: Viết lại Query]
+    K -- Không --> M[Trích xuất Suggested Query từ Verifier]
+    L --> N[Cập nhật Query & Ghi nhận Loop History]
+    M --> N
+    N --> O{Chạm max_iterations?}
+    O -- Chưa --> C
+    O -- Rồi --> Z
+```
+
+### Chi tiết các bước thực hiện trong vòng lặp:
+1. **Memory Context Preparation**:
+   - Truy xuất các **LTM facts** tương quan từ ChromaDB.
+   - Nạp lịch sử **STM session** gần nhất.
+2. **Retrieval Stage**:
+   - Nếu `retrieval` stage bật, gọi mô hình nhúng (`_embed_query`) để chuyển câu hỏi thành vector, thực hiện Semantic Search trên ChromaDB để lấy top-k bằng chứng y khoa.
+3. **Reasoning Stage**:
+   - Đưa prompt (gồm câu hỏi, lựa chọn A-B-C-D, minh chứng y khoa, lịch sử bộ nhớ, v.v.) vào **Reasoning LLM**.
+   - Trích xuất JSON trả về: `answer` (lựa chọn), `explanation` (lời giải thích), `confidence` (độ tin cậy).
+4. **Verifier Stage**:
+   - Nếu `verifier` stage bật, **Verifier LLM** nhận câu trả lời nháp và bằng chứng để đánh giá.
+   - Nếu đạt yêu cầu (`verdict = supported`), dừng vòng lặp ngay lập tức và chọn câu trả lời này.
+   - Nếu không đạt (`verdict = unsupported`), chuyển sang bước tiếp theo.
+5. **Query Rewriter & Loop Execution**:
+   - **Query Rewriter Agent** phân tích lý do từ chối và viết lại câu hỏi tìm kiếm tối ưu hơn.
+   - Lưu thông tin vòng lặp vào `loop_scratchpad`.
+   - Lặp lại từ Bước 2 với truy vấn mới cho đến khi `verdict = supported` hoặc vượt quá `max_iterations`.
+
+---
+
+## 📊 6. Ý Nghĩa Của Tệp Output & Dữ Liệu Kết Quả
+
+Khi chạy ở chế độ **Benchmark**, kết quả sẽ được ghi vào các tệp `.jsonl` trong thư mục [output/](file:///wsl.localhost/Ubuntu/home/cheese00/medai-v0-v3/medai/output) (ví dụ: `output/predictions_v3-qr_1785430074.jsonl`).
+
+### 📌 Cấu trúc Tệp JSONL Output
+
+Mỗi tệp JSONL bao gồm **Phần Header Metadata** ở đầu tệp và **Các Dòng Dữ Liệu (JSON Lines)** đại diện cho kết quả xử lý từng câu hỏi.
+
+#### 1. Header Metadata (Các dòng bình luận đầu tệp)
+```text
+# ============================================================
+# MED-AI predictions — variant=v3-qr
+# generated_at: 1785430074
+# model: deepseek/deepseek-v4-flash
+# split: test  limit: 20
+# pipeline: retrieval(top_k=5) -> reasoning -> verifier(max_iterations=3) -> query_rewriter
+# memory: LTM(read_only)
+# ============================================================
+```
+- Giúp người dùng biết chính xác phiên bản cấu hình (`variant`), thời gian chạy, mô hình LLM được sử dụng, sơ đồ pipeline và trạng thái bộ nhớ.
+
+---
+
+#### 2. Giải Thích Các Trường Dữ Liệu Trong Từng Dòng JSON
+
+Tất cả các phiên bản (V0 đến V3) đều tuân theo một Schema chuẩn hoá thống nhất (`EpisodeResult` trong [core/types.py](file:///wsl.localhost/Ubuntu/home/cheese00/medai-v0-v3/medai/core/types.py)):
+
+| Tên Trường (Field) | Kiểu Dữ Liệu | Ý Nghĩa & Giá Trị | Các Version Hỗ Trợ |
+| :--- | :--- | :--- | :--- |
+| **`question_id`** | `str` | Định danh duy nhất của câu hỏi (ví dụ: `test_00001`). | Tất cả (V0-V3) |
+| **`variant`** | `str` | Tên phiên bản thử nghiệm (`v0`, `v1`, `v2`, `v2-qr`, `v3`, `v3-qr`). | Tất cả (V0-V3) |
+| **`model`** | `str` | Tên mô hình LLM suy luận chính (được cấu hình trong `.env`). | Tất cả (V0-V3) |
+| **`predicted_answer`** | `str` | Đáp án do hệ thống dự đoán (ví dụ: `"A"`, `"B"`, `"C"`, `"D"` hoặc `"INVALID"`). | Tất cả (V0-V3) |
+| **`explanation`** | `str` | Lời giải thích lập luận chi tiết cho đáp án đã chọn. | Tất cả (V0-V3) |
+| **`confidence`** | `float` | Độ tin cậy của câu trả lời (từ `0.0` đến `1.0`). | Tất cả (V0-V3) |
+| **`gold_answer`** | `str \| null` | Đáp án chuẩn xác của bộ dữ liệu (Ground Truth). | Tất cả (V0-V3) |
+| **`is_correct`** | `bool \| null` | Kết quả so sánh (`true` nếu `predicted_answer == gold_answer`, `false` nếu sai). | Tất cả (V0-V3) |
+| **`total_latency_ms`** | `float` | Tổng thời gian xử lý toàn bộ episode (đơn vị: mili-giây). | Tất cả (V0-V3) |
+| **`total_token_usage`** | `dict` | Tổng số lượng token đã sử dụng (`{"input": int, "output": int}`). | Tất cả (V0-V3) |
+| **`estimated_cost`** | `float \| null` | Chi phí ước tính (USD) dựa trên cấu hình giá `pricing` trong YAML. | Tất cả (V0-V3) |
+| **`evidence_used`** | `list[str] \| null` | Danh sách ID các tài liệu minh chứng được RAG lấy ra từ ChromaDB. | V1, V2, V3 |
+| **`retrieval_latency_ms`** | `float \| null` | Thời gian thực thi việc truy xuất RAG (mili-giây). | V1, V2, V3 |
+| **`retrieval_token_usage`**| `dict \| null` | Số token tiêu tốn cho việc truy xuất (thường là 0 nếu dùng nhúng cục bộ). | V1, V2, V3 |
+| **`iteration_count`** | `int \| null` | Số vòng lặp thực tế mà Controller đã chạy cho câu hỏi này. | V2, V3 (Verifier) |
+| **`verifier_verdict`** | `str \| null` | Kết quả kiểm chứng cuối cùng từ Verifier (`"supported"` hoặc `"unsupported"`). | V2, V3 (Verifier) |
+| **`verdict_history`** | `list[str] \| null` | Lịch sử verdict qua từng vòng lặp (ví dụ: `["unsupported", "supported"]`). | V2, V3 (Verifier) |
+| **`stopped_after_max_iterations`** | `bool \| null` | `true` nếu bị dừng do chạm ngưỡng số vòng lặp tối đa mà chưa đạt verdict `supported`. | V2, V3 (Verifier) |
+| **`reasoning_latency_ms`** | `float \| null` | Tổng thời gian các lần chạy của Reasoning Stage. | Tất cả |
+| **`reasoning_token_usage`** | `dict \| null` | Tổng token sử dụng riêng cho Reasoning Stage. | Tất cả |
+| **`verifier_latency_ms`** | `float \| null` | Tổng thời gian thực thi của Verifier Stage. | V2, V3 (Verifier) |
+| **`verifier_token_usage`** | `dict \| null` | Tổng token sử dụng riêng cho Verifier Stage. | V2, V3 (Verifier) |
+| **`query_rewrite_count`** | `int \| null` | Số lần Query Rewriter đã thực hiện viết lại câu hỏi. | V2-QR, V3-QR |
+| **`rewriter_latency_ms`** | `float \| null` | Tổng thời gian thực thi của Query Rewriter Stage. | V2-QR, V3-QR |
+| **`rewriter_token_usage`** | `dict \| null` | Tổng token sử dụng riêng cho Query Rewriter Stage. | V2-QR, V3-QR |
+| **`stm_scope_used`** | `str \| null` | Phạm vi bộ nhớ ngắn hạn được áp dụng (`"loop"`, `"session"`, hoặc `"both"`). | V3 |
+| **`loop_history_length`** | `int \| null` | Số lượng ghi chú lịch sử vòng lặp được giữ trong ngữ cảnh. | V2, V3 |
+| **`ltm_facts_retrieved`** | `list[str] \| null` | Danh sách các thông tin tiền sử/dữ kiện bệnh nhân được trích xuất từ LTM. | V3 (Chat/Benchmark) |
+| **`ltm_write_triggered`** | `bool \| null` | `true` nếu lượt hội thoại này kích hoạt việc ghi dữ kiện mới vào LTM. | V3 (Chat Mode) |
+| **`user_id`** | `str \| null` | Định danh người dùng phục vụ phân tách bộ nhớ LTM. | V3 |
+
+---
+
+## 💡 7. Ghi Chú Phát Triển (Development Notes)
+
+- **Mở rộng Stage mới**: Bạn có thể tạo thêm các Stage tùy chỉnh bằng cách kế thừa `BaseStage` trong [stages/base.py](file:///wsl.localhost/Ubuntu/home/cheese00/medai-v0-v3/medai/stages/base.py) và đăng ký vào `_STAGE_CLASSES` trong [core/runner.py](file:///wsl.localhost/Ubuntu/home/cheese00/medai-v0-v3/medai/core/runner.py).
+- **Chế độ Trace Log Chi Tiết**: Khi đặt `debug: verbose` trong tệp YAML config, ứng dụng sẽ tạo thêm tệp `trace_<variant>_<timestamp>.jsonl` chứa toàn bộ prompt thô, raw LLM response và context ở từng bước để hỗ trợ công tác debug.

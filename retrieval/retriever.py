@@ -1,103 +1,111 @@
-"""Reusable evidence retrieval over the persisted MedRAG Chroma index.
+"""Medical evidence retriever — wrapper quanh Chroma.
 
-Port từ repo nghiên cứu RAG của thành viên trong nhóm
-(Le-Kim-Hung-Security-for-MedQA-USMLE/src/retrieval/retriever.py).
-
-Khác biệt so với bản gốc: bản gốc import `EvidenceChunk` từ
-`src.core.schema` (schema riêng của repo đó). medai-starter chưa có schema
-tương đương nên `EvidenceChunk` được định nghĩa lại ngay tại đây - giữ
-đúng các field (text/title/source/chunk_id/score) để logic retrieve()
-không đổi.
+Collection RAG được ingest bằng HTTP /embeddings endpoint trực tiếp
+(không qua Chroma embedding_function), nên query cũng phải tự embed
+cùng cách rồi truyền query_embeddings thay vì query_texts.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
+import json
+import urllib.error
+import urllib.request
 from typing import Any
 
 import chromadb
 
-from retrieval.ingest_data import (
-    DEFAULT_CHROMA_DIR,
-    DEFAULT_COLLECTION_NAME,
-    embed_batch,
-    load_embedding_config,
-)
+MAX_RETRIES = 3
 
 
-@dataclass
-class EvidenceChunk:
-    text: str
-    title: str | None = None
-    source: str | None = None
-    chunk_id: str | None = None
-    score: float | None = None
+def _embed_query(text: str, model: str, api_base: str, api_key: str) -> list[float]:
+    """Gọi HTTP /embeddings endpoint, mirror cách ingest_data.py đã embed."""
+    payload = json.dumps({
+        "model": model,
+        "input": [text],
+        "encoding_format": "float",
+    }).encode("utf-8")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    url = f"{api_base.rstrip('/')}/embeddings"
+
+    last_error: Exception | None = None
+    for attempt in range(1, MAX_RETRIES + 1):
+        req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+            embeddings = [item["embedding"] for item in body.get("data", [])]
+            if not embeddings:
+                raise RuntimeError("Embedding response rỗng")
+            return embeddings[0]
+        except urllib.error.HTTPError as exc:
+            last_error = RuntimeError(f"HTTP {exc.code}: {exc.read().decode('utf-8', errors='replace')}")
+        except (urllib.error.URLError, TimeoutError, RuntimeError) as exc:
+            last_error = exc
+
+    raise RuntimeError(f"Embed thất bại sau {MAX_RETRIES} lần: {last_error}") from last_error
 
 
-class MedicalEvidenceRetriever:
-    """Retrieve medical evidence chunks from the Chroma index."""
+class MedicalRetriever:
+    """Query Chroma collection đã tồn tại sẵn."""
 
     def __init__(
         self,
-        *,
-        chroma_dir: Path = DEFAULT_CHROMA_DIR,
-        collection_name: str = DEFAULT_COLLECTION_NAME,
-    ) -> None:
-        self.chroma_dir = chroma_dir
-        self.collection_name = collection_name
-        self.embedding_config = load_embedding_config()
-        client = chromadb.PersistentClient(path=str(chroma_dir))
-        self.collection = client.get_collection(name=collection_name)
+        chroma_dir: str = "data/chroma",
+        collection_name: str = "medrag_textbooks",
+        embedding_model: str = "",
+        embedding_base_url: str = "",
+        embedding_api_key: str = "dummy",
+    ):
+        self.embedding_model = embedding_model
+        self.embedding_base_url = embedding_base_url
+        self.embedding_api_key = embedding_api_key
 
-    def retrieve(self, query: str, top_k: int = 5) -> list[EvidenceChunk]:
-        query = query.strip()
-        if not query:
+        if not (embedding_model and embedding_base_url and embedding_api_key):
+            raise ValueError(
+                "Thiếu EMBEDDING_MODEL / EMBEDDING_MODEL_API_BASE / EMBEDDING_MODEL_API_KEY "
+                "trong .env — cần đủ 3 biến để embed câu hỏi khớp dimension với index."
+            )
+
+        self.client = chromadb.PersistentClient(path=chroma_dir)
+        try:
+            self.collection = self.client.get_collection(name=collection_name)
+        except Exception as e:
+            raise ValueError(
+                f"Không tìm thấy collection '{collection_name}' tại '{chroma_dir}'. "
+                f"Lỗi gốc: {e}"
+            ) from e
+
+    def query(self, query_text: str, top_k: int = 5) -> list[dict[str, Any]]:
+        if not query_text.strip():
             return []
-        if top_k < 1:
-            raise ValueError("top_k must be at least 1")
 
-        collection_count = self.collection.count()
-        if collection_count == 0:
+        count = self.collection.count()
+        if count == 0:
             return []
 
-        embeddings, _usage = embed_batch([query], config=self.embedding_config)
-        result = self.collection.query(
-            query_embeddings=[embeddings[0]],
-            n_results=min(top_k, collection_count),
+        query_vector = _embed_query(
+            query_text,
+            model=self.embedding_model,
+            api_base=self.embedding_base_url,
+            api_key=self.embedding_api_key,
+        )
+
+        results = self.collection.query(
+            query_embeddings=[query_vector],
+            n_results=min(top_k, count),
             include=["documents", "metadatas", "distances"],
         )
-        return _to_evidence_chunks(result)
 
+        documents = (results.get("documents") or [[]])[0]
+        metadatas = (results.get("metadatas") or [[]])[0]
+        distances = (results.get("distances") or [[]])[0]
+        ids = (results.get("ids") or [[]])[0]
 
-def _to_evidence_chunks(result: dict[str, Any]) -> list[EvidenceChunk]:
-    ids = _first_query_values(result, "ids")
-    documents = _first_query_values(result, "documents")
-    metadatas = _first_query_values(result, "metadatas")
-    distances = _first_query_values(result, "distances")
-
-    chunks: list[EvidenceChunk] = []
-    for index, chunk_id in enumerate(ids):
-        metadata = metadatas[index] or {}
-        chunks.append(
-            EvidenceChunk(
-                text=documents[index],
-                title=_optional_metadata_text(metadata.get("title")),
-                source=_optional_metadata_text(metadata.get("source")),
-                chunk_id=str(chunk_id),
-                score=float(distances[index]),
-            )
-        )
-    return chunks
-
-
-def _first_query_values(result: dict[str, Any], key: str) -> list[Any]:
-    values = result.get(key) or [[]]
-    return values[0]
-
-
-def _optional_metadata_text(value: Any) -> str | None:
-    if value is None:
-        return None
-    text = str(value).strip()
-    return text or None
+        return [
+            {"id": doc_id, "text": doc, "metadata": meta or {}, "distance": float(dist)}
+            for doc_id, doc, meta, dist in zip(ids, documents, metadatas, distances)
+        ]

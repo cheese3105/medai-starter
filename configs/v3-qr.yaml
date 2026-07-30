@@ -1,0 +1,95 @@
+# V3 + Query Rewriter — so sánh trực tiếp với v3.yaml (không có rewriter)
+variant: "v3-qr"
+debug: "info"
+seed: null
+
+pipeline:
+  - name: retrieval
+    enabled: true
+    top_k: 5
+    chroma_dir: "data/chroma/medrag_textbooks_bge_m3_openrouter"
+    collection_name: "medrag_textbooks"
+
+  - name: reasoning
+    enabled: true
+    temperature: 0.0
+    prompt_template: |
+      Answer this medical question using the provided evidence. Choose ONE best answer.
+
+      Previous attempts (learn from these, do NOT repeat the same mistakes):
+      {loop_history}
+
+      Lessons from similar questions:
+      {ltm_facts}
+
+      Evidence:
+      {evidence}
+
+      Question:
+      {question}
+
+      Choices:
+      {choices}
+
+      Return JSON only:
+      {{
+        "answer": "A or B or C or D",
+        "explanation": "brief explanation referencing the evidence",
+        "confidence": 0.0 to 1.0
+      }}
+
+  - name: verifier
+    enabled: true
+    max_iterations: 3
+    prompt_template: |
+      You are a medical answer verifier. Check if the draft answer is supported by the evidence.
+
+      Question: {question}
+      Choices: {choices}
+      Draft answer: {draft_answer}
+      Draft explanation: {draft_explanation}
+      Evidence: {evidence}
+      Known facts about user: {ltm_facts}
+
+      Return JSON only:
+      {{
+        "verdict": "supported or unsupported",
+        "final_answer": "A or B or C or D",
+        "confidence": 0.0 to 1.0,
+        "explanation": "why supported or not"
+      }}
+
+  - name: query_rewriter
+    enabled: true
+    prompt_template: |
+      You are a search query optimizer for a medical evidence retrieval system.
+
+      Original question: {question}
+      Evidence retrieved so far (was NOT sufficient): {evidence}
+      Why the previous answer was rejected: {draft_explanation}
+      Previous attempts: {loop_history}
+
+      Write ONE improved, specific search query that targets the missing
+      medical knowledge. Do NOT repeat the original question verbatim.
+
+      Return JSON only:
+      {{
+        "rewritten_query": "your improved search query",
+        "reasoning": "brief reason for this query"
+      }}
+
+memory:
+  short_term:
+    enabled: true
+    scope: "loop"
+    max_items: 10
+
+  long_term:
+    enabled: true
+    top_k: 3
+    mode: "read_only"
+    collection_name: "reflections"
+
+pricing:
+  input_per_1k: null
+  output_per_1k: null

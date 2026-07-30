@@ -19,18 +19,12 @@ env/
 # Secrets & environment variables
 .env
 
-# Large files
+# Large data files
 data/
-Archive.zip
 *.zip
 
-# macOS
+# OS & IDE
 .DS_Store
-
-# Output files (re-generated on each run — no need to track)
-output/*
-!output/.gitkeep
-
-# IDE
 .vscode/
 .idea/
+*:Zone.Identifier
