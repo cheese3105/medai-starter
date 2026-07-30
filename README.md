@@ -188,7 +188,7 @@ Trả lời: Dựa trên tiền sử dị ứng Penicillin của bạn, chúng t
 
 ## 🔄 5. Luồng Hoạt Động Của Hệ Thống (System Execution Flow)
 
-Hệ thống hoạt động theo mô hình **Controller Loop** được quản lý trong [core/runner.py](file:///wsl.localhost/Ubuntu/home/cheese00/medai-v0-v3/medai/core/runner.py):
+Hệ thống hoạt động theo mô hình **Controller Loop** được quản lý trong `core/runner.py`:
 
 ```mermaid
 flowchart TD
@@ -236,7 +236,7 @@ flowchart TD
 
 ## 📊 6. Ý Nghĩa Của Tệp Output & Dữ Liệu Kết Quả
 
-Khi chạy ở chế độ **Benchmark**, kết quả sẽ được ghi vào các tệp `.jsonl` trong thư mục [output/](file:///wsl.localhost/Ubuntu/home/cheese00/medai-v0-v3/medai/output) (ví dụ: `output/predictions_v3-qr_1785430074.jsonl`).
+Khi chạy ở chế độ **Benchmark**, kết quả sẽ được ghi vào các tệp `.jsonl` trong thư mục `output/` (ví dụ: `output/predictions_v3-qr_1785430074.jsonl`).
 
 ### 📌 Cấu trúc Tệp JSONL Output
 
@@ -259,7 +259,7 @@ Mỗi tệp JSONL bao gồm **Phần Header Metadata** ở đầu tệp và **C�
 
 #### 2. Giải Thích Các Trường Dữ Liệu Trong Từng Dòng JSON
 
-Tất cả các phiên bản (V0 đến V3) đều tuân theo một Schema chuẩn hoá thống nhất (`EpisodeResult` trong [core/types.py](file:///wsl.localhost/Ubuntu/home/cheese00/medai-v0-v3/medai/core/types.py)):
+Tất cả các phiên bản (V0 đến V3) đều tuân theo một Schema chuẩn hoá thống nhất (`EpisodeResult` trong `core/types.py`):
 
 | Tên Trường (Field) | Kiểu Dữ Liệu | Ý Nghĩa & Giá Trị | Các Version Hỗ Trợ |
 | :--- | :--- | :--- | :--- |
@@ -298,5 +298,5 @@ Tất cả các phiên bản (V0 đến V3) đều tuân theo một Schema chu�
 
 ## 💡 7. Ghi Chú Phát Triển (Development Notes)
 
-- **Mở rộng Stage mới**: Bạn có thể tạo thêm các Stage tùy chỉnh bằng cách kế thừa `BaseStage` trong [stages/base.py](file:///wsl.localhost/Ubuntu/home/cheese00/medai-v0-v3/medai/stages/base.py) và đăng ký vào `_STAGE_CLASSES` trong [core/runner.py](file:///wsl.localhost/Ubuntu/home/cheese00/medai-v0-v3/medai/core/runner.py).
+- **Mở rộng Stage mới**: Bạn có thể tạo thêm các Stage tùy chỉnh bằng cách kế thừa `BaseStage` trong `stages/base.py` và đăng ký vào `_STAGE_CLASSES` trong `core/runner.py`.
 - **Chế độ Trace Log Chi Tiết**: Khi đặt `debug: verbose` trong tệp YAML config, ứng dụng sẽ tạo thêm tệp `trace_<variant>_<timestamp>.jsonl` chứa toàn bộ prompt thô, raw LLM response và context ở từng bước để hỗ trợ công tác debug.

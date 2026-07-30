@@ -1,0 +1,8 @@
+# ============================================================
+# MED-AI predictions — variant=v2-qr
+# generated_at: 1785431791
+# models: retrieval: bge-m3, reasoning: deepseek/deepseek-v4-flash, verifier: deepseek/deepseek-v4-flash, query_rewriter: deepseek/deepseek-v4-flash
+# split: train  limit: 5
+# pipeline: retrieval(top_k=5) -> reasoning -> verifier(max_iterations=3) -> query_rewriter
+# memory: OFF
+# ============================================================
