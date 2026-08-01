@@ -27,6 +27,8 @@ thay vì số câu thực sự chạy được (phòng khi 1 biến thể bị l
 python evaluate.py --dir predictions --official-n 1273
 ```
 
+thêm --limit-first-n 200 để chọn 200 câu đầu tiên
+
 ## Output
 
 Trong thư mục `--out-dir` (mặc định thư mục hiện tại):
@@ -61,7 +63,7 @@ Trong thư mục `--out-dir` (mặc định thư mục hiện tại):
    ```
    Nếu file prediction đã có sẵn field `estimated_cost` thì script tự dùng luôn, không cần bảng giá.
 
-2. **Lệch số câu giữa các biến thể** (như 2 file bạn gửi: v0 có 222 câu, v3-qr có 498 câu):
+2. **Lệch số câu giữa các biến thể**:
    script tự động in cảnh báo ra `stderr` và **chỉ so sánh trên phần giao nhau** (câu hỏi có ở
    cả 2 biến thể). Để kết quả ablation study đáng tin cậy, tất cả biến thể nên chạy trên
    **đúng cùng một tập câu hỏi** (dev set 100-150 câu khi debug, rồi 1273 câu chính thức khi

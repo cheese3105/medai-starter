@@ -257,6 +257,36 @@ def estimate_cost(record: Record) -> Optional[float]:
     return (usage["input"] / 1e6) * pricing["input"] + (usage["output"] / 1e6) * pricing["output"]
 
 
+def limit_to_first_n_questions(variants: dict[str, "VariantData"], n: int) -> None:
+    """
+    Cắt MỌI biến thể trong `variants` xuống chỉ còn N câu hỏi đầu tiên, chọn theo
+    question_id sắp xếp tăng dần trên HỢP các question_id xuất hiện ở bất kỳ biến thể nào
+    (đảm bảo dùng đúng 1 bộ ID chung, không phải "N dòng đầu của mỗi file" một cách độc lập —
+    vì thứ tự dòng có thể lệch nhau giữa các file).
+    Sửa trực tiếp (in-place) từng VariantData.records.
+    """
+    all_ids: set[str] = set()
+    for vdata in variants.values():
+        all_ids |= set(vdata.records.keys())
+
+    # Sắp xếp tự nhiên theo phần số trong question_id (vd test_00000, test_00001, ...);
+    # fallback về sort chuỗi thường nếu id không theo dạng đó.
+    def sort_key(qid: str):
+        import re
+        m = re.search(r"(\d+)", qid)
+        return (int(m.group(1)) if m else float("inf"), qid)
+
+    target_ids = set(sorted(all_ids, key=sort_key)[:n])
+
+    for vdata in variants.values():
+        before = len(vdata.records)
+        vdata.records = {qid: rec for qid, rec in vdata.records.items() if qid in target_ids}
+        after = len(vdata.records)
+        print(f"  [--limit-first-n] '{vdata.variant}': {before} -> {after} câu "
+              f"(giữ lại các câu nằm trong {n} ID đầu tiên).")
+
+
+
 def compute_variant_summary(vdata: VariantData, official_n: Optional[int] = None) -> dict:
     """
     Tính các chỉ số tổng hợp cho 1 biến thể.
@@ -682,6 +712,11 @@ def main():
     parser.add_argument("--official-n", type=int, default=None,
                          help="Số câu chính thức của test set (vd 1273 cho MedQA-USMLE full) "
                               "để tính accuracy trên mẫu số cố định thay vì số câu thực chạy được.")
+    parser.add_argument("--limit-first-n", type=int, default=None,
+                         help="Chỉ giữ lại N câu hỏi đầu tiên (theo thứ tự question_id tăng dần, "
+                              "vd test_00000..test_00199 cho N=200) ở MỌI biến thể trước khi tính "
+                              "toán bất kỳ metric nào. Dùng khi các file có số câu khác nhau và bạn "
+                              "muốn ép so sánh công bằng trên cùng một tập câu hỏi con.")
     parser.add_argument("--out-dir", default=".",
                          help="Thư mục lưu output CSV/JSON/Markdown (mặc định thư mục hiện tại).")
     parser.add_argument("--report", default="report.md",
@@ -708,6 +743,12 @@ def main():
         variants[vdata.variant] = vdata
         print(f"Đã nạp variant '{vdata.variant}': {len(vdata)} câu hỏi (từ {fp})")
     print()
+
+    if args.limit_first_n:
+        print(f"==> Áp dụng --limit-first-n={args.limit_first_n}: giới hạn mọi biến thể "
+              f"về cùng {args.limit_first_n} câu hỏi đầu tiên (theo question_id).\n")
+        limit_to_first_n_questions(variants, args.limit_first_n)
+        print()
 
     # 2. Xác định baseline
     baseline_name = args.baseline
