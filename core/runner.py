@@ -59,6 +59,10 @@ class Runner:
         self.has_retrieval = "retrieval" in self.stages
         self.has_query_rewriter = "query_rewriter" in self.stages
         self.max_iterations = run_config.max_iterations
+        self.stm_loop_enabled = (
+            run_config.memory.short_term.enabled
+            and run_config.memory.short_term.scope in ("loop", "both")
+        )
 
     def run_episode(self, episode_input: EpisodeInput, *,
                     stm_session_history: Optional[str] = None,
@@ -162,9 +166,10 @@ class Runner:
                     suggested = out.data.get("suggested_query", "")
                     new_query = suggested if suggested else context["question"]
 
-                entry = f"[iter {iteration}] answer={draft_answer}, verdict=unsupported, reason={out.data.get('explanation', '')}"
                 base_context["question"] = new_query
-                loop_scratchpad.append(entry)
+                if self.stm_loop_enabled:
+                    entry = f"[iter {iteration}] answer={draft_answer}, verdict=unsupported, reason={out.data.get('explanation', '')}"
+                    loop_scratchpad.append(entry)
             else:
                 final_answer, final_explanation, final_confidence = draft_answer, draft_explanation, draft_confidence
                 break
