@@ -4,19 +4,19 @@
     {
       "variant": "v0",
       "filepath": "output/predictions_v0_1785504060.jsonl",
-      "n_total": 200,
-      "n_denom_used_for_accuracy": 200,
-      "n_correct": 185,
-      "n_valid": 199,
+      "n_total": 222,
+      "n_denom_used_for_accuracy": 222,
+      "n_correct": 205,
+      "n_valid": 221,
       "n_invalid": 1,
-      "accuracy": 0.925,
-      "invalid_rate": 0.005,
-      "avg_latency_ms": 13096.661169528961,
-      "median_latency_ms": 7694.21660900116,
-      "p95_latency_ms": 39679.291713237675,
-      "total_input_tokens": 52867,
-      "total_output_tokens": 99803,
-      "avg_tokens_per_question": 763.35,
+      "accuracy": 0.9234234234234234,
+      "invalid_rate": 0.0045045045045045045,
+      "avg_latency_ms": 13060.560328466398,
+      "median_latency_ms": 7796.3056564331055,
+      "p95_latency_ms": 38743.16720962524,
+      "total_input_tokens": 58347,
+      "total_output_tokens": 108839,
+      "avg_tokens_per_question": 753.0900900900901,
       "total_estimated_cost_usd": null,
       "avg_cost_per_question_usd": null,
       "pipeline": "reasoning",
@@ -70,19 +70,19 @@
     {
       "variant": "v3-qr",
       "filepath": "output/predictions_v3-qr_1785466972.jsonl",
-      "n_total": 199,
-      "n_denom_used_for_accuracy": 199,
-      "n_correct": 180,
-      "n_valid": 199,
+      "n_total": 498,
+      "n_denom_used_for_accuracy": 498,
+      "n_correct": 440,
+      "n_valid": 498,
       "n_invalid": 0,
-      "accuracy": 0.9045226130653267,
+      "accuracy": 0.8835341365461847,
       "invalid_rate": 0.0,
-      "avg_latency_ms": 59024.98531940595,
-      "median_latency_ms": 38916.3613319397,
-      "p95_latency_ms": 165144.6901321411,
-      "total_input_tokens": 1037499,
-      "total_output_tokens": 518849,
-      "avg_tokens_per_question": 7820.844221105528,
+      "avg_latency_ms": 65514.905439801965,
+      "median_latency_ms": 42856.810092926025,
+      "p95_latency_ms": 178876.90289020527,
+      "total_input_tokens": 2655203,
+      "total_output_tokens": 1371418,
+      "avg_tokens_per_question": 8085.584337349397,
       "total_estimated_cost_usd": null,
       "avg_cost_per_question_usd": null,
       "pipeline": "retrieval(top_k=5) -> reasoning -> verifier(max_iterations=3) -> query_rewriter",
@@ -178,41 +178,41 @@
     {
       "variant_a": "v0",
       "variant_b": "v3-qr",
-      "n_common_questions": 199,
+      "n_common_questions": 221,
       "win_loss_tie": {
-        "n_questions": 199,
+        "n_questions": 221,
         "a_wins": 13,
-        "b_wins": 9,
-        "ties_both_correct": 171,
-        "ties_both_wrong": 6,
-        "a_win_rate": 0.06532663316582915,
-        "b_win_rate": 0.04522613065326633
+        "b_wins": 10,
+        "ties_both_correct": 191,
+        "ties_both_wrong": 7,
+        "a_win_rate": 0.058823529411764705,
+        "b_win_rate": 0.04524886877828054
       },
       "mcnemar": {
-        "n_disagree": 22,
+        "n_disagree": 23,
         "b_a_only_correct": 13,
-        "c_b_only_correct": 9,
+        "c_b_only_correct": 10,
         "statistic": null,
-        "p_value": 0.5234670639038086,
+        "p_value": 0.6776394844055176,
         "method": "exact_binomial"
       },
       "bootstrap": {
         "n_bootstrap": 10000,
-        "n_questions": 199,
-        "acc_a_point": 0.9246231155778895,
+        "n_questions": 221,
+        "acc_a_point": 0.9230769230769231,
         "acc_a_ci95": [
-          0.8844221105527639,
-          0.9597989949748744
+          0.8868778280542986,
+          0.9547511312217195
         ],
-        "acc_b_point": 0.9045226130653267,
+        "acc_b_point": 0.9095022624434389,
         "acc_b_ci95": [
-          0.8592964824120602,
-          0.9447236180904522
+          0.8687782805429864,
+          0.9457013574660633
         ],
-        "gain_point": -0.02010050251256279,
+        "gain_point": -0.013574660633484226,
         "gain_ci95": [
-          -0.0653266331658292,
-          0.025125628140703515
+          -0.05882352941176472,
+          0.02714932126696834
         ],
         "gain_significant": false
       }
@@ -506,7 +506,7 @@
     {
       "baseline": "v0",
       "variant": "v3-qr",
-      "n_fixes": 9,
+      "n_fixes": 10,
       "n_regressions": 13,
       "fixes_examples": [
         {
@@ -562,6 +562,12 @@
           "predicted_answer": "A",
           "gold_answer": "A",
           "confidence": 1.0
+        },
+        {
+          "question_id": "test_00216",
+          "predicted_answer": "D",
+          "gold_answer": "D",
+          "confidence": 0.3
         }
       ],
       "regressions_examples": [

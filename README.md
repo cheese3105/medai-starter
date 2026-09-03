@@ -27,7 +27,7 @@ Framework được thiết kế với 4 phiên bản kiến trúc chính:
 ## 📁 2. Cấu Trúc Thư Mục Project
 
 ```text
-medai/
+.
 ├── configs/                # Tệp cấu hình thí nghiệm YAML (v0.yaml -> v3-chat.yaml)
 │   ├── v0.yaml             # Config V0 Direct Reasoning
 │   ├── v1.yaml             # Config V1 RAG
@@ -42,6 +42,7 @@ medai/
 │   └── types.py            # Khai báo schema dữ liệu (EpisodeInput, EpisodeResult, StageOutput)
 ├── data/                   # Thư mục chứa dữ liệu Vector Store (ChromaDB)
 │   └── chroma/             # Cơ sở dữ liệu vector sách y khoa & LTM
+├── evaluate-results/       # Kết quả & báo cáo đánh giá (CSV, Markdown report, JSON)
 ├── memory/                 # Hệ thống quản lý bộ nhớ
 │   ├── short_term.py       # Session Buffer giữ N lượt hội thoại gần nhất
 │   └── long_term.py        # Quản lý & trích xuất bộ nhớ dài hạn với ChromaDB
@@ -58,8 +59,10 @@ medai/
 │   ├── verifier.py         # Stage kiểm chứng & phản biện
 │   └── query_rewriter.py   # Stage viết lại truy vấn tìm kiếm
 ├── .env.example            # Tệp mẫu khai báo biến môi trường
+├── evaluate.py             # Script đánh giá & kiểm định thống kê (McNemar, Bootstrap CI)
 ├── main.py                 # CLI Entrypoint chính của ứng dụng
 ├── pyrightconfig.json      # Cấu hình type-checking Python
+├── README_evaluate.md      # Hướng dẫn chi tiết đánh giá & so sánh biến thể
 └── requirements.txt        # Danh sách thư viện phụ thuộc
 ```
 
@@ -105,7 +108,7 @@ medai/
 
    # --- Embedding Model (Cần thiết cho V1+ RAG và V3 LTM) ---
    # EMBEDDING_MODEL=bge-m3
-   # EMBEDDING_MODEL_API_BASE=https://openrouter.ai/api/v1
+   # EMBEDDING_MODEL_BASE_URL=https://openrouter.ai/api/v1   # Hoặc EMBEDDING_MODEL_API_BASE
    # EMBEDDING_MODEL_API_KEY=your-key
 
    # --- Query Rewriter Model (Tùy chọn) ---
@@ -117,13 +120,13 @@ medai/
 Cơ sở dữ liệu ChromaDB đã được ingest sẵn: https://drive.google.com/file/d/1pIQYQ7CHJPbWqNW07kff5XA3YS8ER_Bb/view?usp=sharing
 
 Giải nén file zip dữ liệu đã xây dựng sẵn
-Copy đường dẫn `data/chroma/...` bỏ vào `medai/data/chroma/...`
+Copy thư mục `data/chroma/...` vào thư mục gốc của project: `data/chroma/...`
 
 ---
 
 ## 🚀 4. Hướng Dẫn Sử Dụng (How to Run)
 
-Ứng dụng chạy thông qua file [main.py](file:///wsl.localhost/Ubuntu/home/cheese00/medai-v0-v3/medai/main.py) với 2 chế độ chính: `--mode benchmark` và `--mode chat`.
+Ứng dụng chạy thông qua file [main.py](main.py) với 2 chế độ chính: `--mode benchmark` và `--mode chat`.
 
 ### A. Chế Độ Benchmark (Chạy Đánh Giá Tự Động)
 
@@ -188,6 +191,18 @@ Trả lời: Cảm ơn bạn đã chia sẻ. Tôi đã ghi nhận thông tin b�
 Câu hỏi: Tôi đang bị đau họng, bác sĩ có thể kê đơn thuốc kháng sinh được không?
 Trả lời: Dựa trên tiền sử dị ứng Penicillin của bạn, chúng ta tuyệt đối không sử dụng nhóm kháng sinh Penicillin...
 ```
+
+---
+
+### C. Chế Độ Đánh Giá & So Sánh Kết Quả (Evaluation Suite)
+
+Sau khi chạy Benchmark và thu được các file `output/predictions_*.jsonl`, sử dụng `evaluate.py` để tính toán các chỉ số thống kê (Accuracy, Accuracy Gain, McNemar's Test, Bootstrap 95% CI, Win/Loss/Tie, Latency, Token, Cost):
+
+```bash
+python evaluate.py --dir output --out-dir evaluate-results --baseline v0
+```
+
+> 📖 Xem chi tiết các tham số nâng cao và định dạng báo cáo tại [README_evaluate.md](README_evaluate.md).
 
 ---
 

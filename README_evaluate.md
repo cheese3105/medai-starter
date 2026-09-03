@@ -2,36 +2,45 @@
 
 ## Cài đặt
 ```bash
+# Đã bao gồm sẵn trong requirements.txt:
+pip install -r requirements.txt
+
+# Hoặc nếu chỉ cài riêng cho script evaluate:
 pip install numpy scipy
 ```
 
 ## Cách chạy
 
-Đặt tất cả file `predictions_*.jsonl` (V0, V1, V2, V3, V3-qr, V4...) vào 1 thư mục,
-ví dụ `predictions/`, rồi chạy:
+Các file dự đoán `predictions_*.jsonl` (V0, V1, V2, V2-qr, V3-qr...) mặc định được lưu trong thư mục `output/`.
+
+Để đánh giá toàn bộ các file trong thư mục `output/` và xuất kết quả vào `evaluate-results/`:
 
 ```bash
-python evaluate.py --dir predictions --out-dir results --baseline v0
+python evaluate.py --dir output --out-dir evaluate-results --baseline v0
 ```
 
-Hoặc chỉ định file cụ thể:
+Hoặc chỉ định các file cụ thể (hỗ trợ glob pattern):
 
 ```bash
-python evaluate.py --files predictions_v0.jsonl predictions_v3.jsonl --baseline v0
+python evaluate.py --files output/predictions_v0_*.jsonl output/predictions_v3-qr_*.jsonl --out-dir evaluate-results --baseline v0
 ```
 
 Nếu muốn accuracy tính trên mẫu số cố định của test set chính thức (1273 câu MedQA-USMLE)
 thay vì số câu thực sự chạy được (phòng khi 1 biến thể bị lỗi API rớt vài câu):
 
 ```bash
-python evaluate.py --dir predictions --official-n 1273
+python evaluate.py --dir output --out-dir evaluate-results --official-n 1273
 ```
 
-thêm --limit-first-n 200 để chọn 200 câu đầu tiên
+Thêm `--limit-first-n 200` để chỉ so sánh trên 200 câu đầu tiên (theo `question_id`):
+
+```bash
+python evaluate.py --dir output --out-dir evaluate-results --limit-first-n 200
+```
 
 ## Output
 
-Trong thư mục `--out-dir` (mặc định thư mục hiện tại):
+Trong thư mục `--out-dir` (ví dụ `evaluate-results/` hoặc mặc định là thư mục hiện tại):
 
 - `summary_metrics.csv` — accuracy, invalid rate, latency, token, cost theo từng biến thể
 - `pairwise_comparison.csv` — win/loss/tie, McNemar p-value, bootstrap CI của accuracy gain

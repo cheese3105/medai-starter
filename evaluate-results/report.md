@@ -6,10 +6,10 @@ Baseline dùng để so sánh: **v0**
 
 | Variant | N | Accuracy | Invalid Rate | Avg Latency (ms) | Avg Tokens/Q | Total Cost (USD) | Pipeline |
 |---|---|---|---|---|---|---|---|
-| v0 | 200 | 92.50% | 0.50% | 13,097 | 763 | N/A | reasoning |
+| v0 | 222 | 92.34% | 0.45% | 13,061 | 753 | N/A | reasoning |
 | v1 | 200 | 89.00% | 1.00% | 17,812 | 1,921 | N/A | retrieval(top_k=5) -> reasoning |
 | v2-qr | 200 | 88.00% | 0.00% | 53,805 | 7,569 | N/A | retrieval(top_k=5) -> reasoning -> verifier(max_iterations=3) -> query_rewriter |
-| v3-qr | 199 | 90.45% | 0.00% | 59,025 | 7,821 | N/A | retrieval(top_k=5) -> reasoning -> verifier(max_iterations=3) -> query_rewriter |
+| v3-qr | 498 | 88.35% | 0.00% | 65,515 | 8,086 | N/A | retrieval(top_k=5) -> reasoning -> verifier(max_iterations=3) -> query_rewriter |
 
 ## 2. So sánh cặp với baseline (accuracy gain, McNemar, bootstrap CI)
 
@@ -31,11 +31,11 @@ Baseline dùng để so sánh: **v0**
 
 ### v0 (baseline) vs v3-qr
 
-- Số câu hỏi chung: **199**
-- Accuracy: v0 = 92.46% (95% CI [88.44%, 95.98%]), v3-qr = 90.45% (95% CI [85.93%, 94.47%])
-- **Accuracy gain**: -2.01 điểm % (95% CI [-6.53%, +2.51%]) — ❌ chưa có ý nghĩa (bootstrap, α=0.05)
-- **McNemar test** (exact_binomial): b=13 (chỉ v0 đúng), c=9 (chỉ v3-qr đúng), p-value = 0.5235 (❌ chưa có ý nghĩa ở α=0.05)
-- **Win/Loss/Tie**: v0 thắng 13 câu, v3-qr thắng 9 câu, hoà (cả 2 đúng) 171 câu, hoà (cả 2 sai) 6 câu
+- Số câu hỏi chung: **221**
+- Accuracy: v0 = 92.31% (95% CI [88.69%, 95.48%]), v3-qr = 90.95% (95% CI [86.88%, 94.57%])
+- **Accuracy gain**: -1.36 điểm % (95% CI [-5.88%, +2.71%]) — ❌ chưa có ý nghĩa (bootstrap, α=0.05)
+- **McNemar test** (exact_binomial): b=13 (chỉ v0 đúng), c=10 (chỉ v3-qr đúng), p-value = 0.6776 (❌ chưa có ý nghĩa ở α=0.05)
+- **Win/Loss/Tie**: v0 thắng 13 câu, v3-qr thắng 10 câu, hoà (cả 2 đúng) 191 câu, hoà (cả 2 sai) 7 câu
 
 ## 3. Phân tích lỗi (Error Analysis)
 
@@ -81,7 +81,7 @@ Baseline dùng để so sánh: **v0**
 
 ### v0 → v3-qr
 
-- Số câu được **sửa đúng** (baseline sai, variant đúng): **9**
+- Số câu được **sửa đúng** (baseline sai, variant đúng): **10**
 - Số câu bị **hồi quy** (baseline đúng, variant sai): **13**
 
 **Ví dụ câu bị hồi quy (tối đa hiển thị một phần):**
