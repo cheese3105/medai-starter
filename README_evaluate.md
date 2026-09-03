@@ -4,9 +4,6 @@
 ```bash
 # Đã bao gồm sẵn trong requirements.txt:
 pip install -r requirements.txt
-
-# Hoặc nếu chỉ cài riêng cho script evaluate:
-pip install numpy scipy
 ```
 
 ## Cách chạy
@@ -19,7 +16,7 @@ Các file dự đoán `predictions_*.jsonl` (V0, V1, V2, V2-qr, V3-qr...) mặc 
 python evaluate.py --dir output --out-dir evaluate-results --baseline v0
 ```
 
-Hoặc chỉ định các file cụ thể (hỗ trợ glob pattern):
+Hoặc chỉ định file cụ thể:
 
 ```bash
 python evaluate.py --files output/predictions_v0_*.jsonl output/predictions_v3-qr_*.jsonl --out-dir evaluate-results --baseline v0

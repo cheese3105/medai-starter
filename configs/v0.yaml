@@ -1,6 +1,6 @@
 # V0 — Baseline: chỉ LLM, không RAG, không Verifier, không Memory
 variant: "v0"
-debug: "off"
+debug: "info"
 seed: null
 
 pipeline:
