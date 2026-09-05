@@ -42,6 +42,8 @@ medai/
 │   └── types.py            # Khai báo schema dữ liệu (EpisodeInput, EpisodeResult, StageOutput)
 ├── data/                   # Thư mục chứa dữ liệu Vector Store (ChromaDB)
 │   └── chroma/             # Cơ sở dữ liệu vector sách y khoa & LTM
+├── evaluate/               # Công cụ tính toán & so sánh metrics giữa các biến thể
+│   └── evaluate.py         # Đọc predictions .jsonl -> accuracy, McNemar, bootstrap CI, report.md
 ├── memory/                 # Hệ thống quản lý bộ nhớ
 │   ├── short_term.py       # Session Buffer giữ N lượt hội thoại gần nhất
 │   └── long_term.py        # Quản lý & trích xuất bộ nhớ dài hạn với ChromaDB
@@ -85,6 +87,7 @@ medai/
    ```bash
    pip install -r requirements.txt
    ```
+   (bao gồm cả `numpy`/`scipy` — cần cho `evaluate/evaluate.py` khi tính McNemar's test & bootstrap CI, xem mục 5)
 
 3. **Cấu hình biến môi trường (`.env`)**:
    Sao chép tệp mẫu `.env.example` thành `.env`:
@@ -191,55 +194,83 @@ Trả lời: Dựa trên tiền sử dị ứng Penicillin của bạn, chúng t
 
 ---
 
-## 🔄 5. Luồng Hoạt Động Của Hệ Thống (System Execution Flow)
+## 📈 5. Đánh Giá & So Sánh Các Biến Thể (`evaluate/evaluate.py`)
 
-Hệ thống hoạt động theo mô hình **Controller Loop** được quản lý trong `core/runner.py`:
+Sau khi chạy Benchmark ra các file `.jsonl` trong `output/`, dùng `evaluate/evaluate.py` để tính accuracy, invalid rate, so sánh cặp biến thể (win/loss/tie, McNemar's test, bootstrap 95% CI) và ước tính cost/latency.
 
-```mermaid
-flowchart TD
-    A[Bắt đầu Episode / Lượt Chat] --> B[Nạp Ngữ Cảnh Bộ Nhớ: STM & LTM]
-    B --> C{Bắt đầu Vòng Lặp Iteration 1..N}
-    C --> D{Retrieval Enabled?}
-    D -- Có --> E[Query Chroma Vector Store -> Lấy Evidence]
-    D -- Không --> F[Reasoning Stage]
-    E --> F
-    F --> G[Tạo Draft Answer + Explanation + Confidence]
-    G --> H{Verifier Enabled?}
-    H -- Không --> Z[Trả về Kết Quả Cuối Cùng]
-    H -- Có --> I[Verifier Stage: Fact-check Draft Answer]
-    I --> J{Verdict == 'supported'?}
-    J -- Supported --> Z
-    J -- Unsupported --> K{Query Rewriter Enabled?}
-    K -- Có --> L[Query Rewriter Stage: Viết lại Query]
-    K -- Không --> M[Trích xuất Suggested Query từ Verifier]
-    L --> N[Cập nhật Query & Ghi nhận Loop History]
-    M --> N
-    N --> O{Chạm max_iterations?}
-    O -- Chưa --> C
-    O -- Rồi --> Z
+**Cú pháp**:
+```bash
+# Chỉ định file cụ thể
+python evaluate/evaluate.py --files output/predictions_v0_*.jsonl output/predictions_v3-qr_*.jsonl
+
+# Hoặc tự quét toàn bộ *.jsonl trong 1 thư mục
+python evaluate/evaluate.py --dir output --baseline v0 --report report.md
 ```
 
-### Chi tiết các bước thực hiện trong vòng lặp:
-1. **Memory Context Preparation**:
-   - Truy xuất các **LTM facts** tương quan từ ChromaDB.
-   - Nạp lịch sử **STM session** gần nhất.
-2. **Retrieval Stage**:
-   - Nếu `retrieval` stage bật, gọi mô hình nhúng (`_embed_query`) để chuyển câu hỏi thành vector, thực hiện Semantic Search trên ChromaDB để lấy top-k bằng chứng y khoa.
-3. **Reasoning Stage**:
-   - Đưa prompt (gồm câu hỏi, lựa chọn A-B-C-D, minh chứng y khoa, lịch sử bộ nhớ, v.v.) vào **Reasoning LLM**.
-   - Trích xuất JSON trả về: `answer` (lựa chọn), `explanation` (lời giải thích), `confidence` (độ tin cậy).
-4. **Verifier Stage**:
-   - Nếu `verifier` stage bật, **Verifier LLM** nhận câu trả lời nháp và bằng chứng để đánh giá.
-   - Nếu đạt yêu cầu (`verdict = supported`), dừng vòng lặp ngay lập tức và chọn câu trả lời này.
-   - Nếu không đạt (`verdict = unsupported`), chuyển sang bước tiếp theo.
-5. **Query Rewriter & Loop Execution**:
-   - **Query Rewriter Agent** phân tích lý do từ chối và viết lại câu hỏi tìm kiếm tối ưu hơn.
-   - Lưu thông tin vòng lặp vào `loop_scratchpad`.
-   - Lặp lại từ Bước 2 với truy vấn mới cho đến khi `verdict = supported` hoặc vượt quá `max_iterations`.
+**Các tham số chính**:
+- `--files` / `--dir`: chọn file cụ thể (hỗ trợ glob) hoặc quét cả thư mục.
+- `--baseline`: tên variant làm mốc so sánh (mặc định: variant có chứa `"v0"`).
+- `--official-n`: dùng số câu chính thức của test set (vd `1273` cho MedQA-USMLE full) làm mẫu số accuracy, thay vì số câu thực chạy được.
+- `--limit-first-n`: chỉ giữ N câu hỏi đầu tiên (theo `question_id`) ở mọi biến thể để so sánh công bằng khi các file có số câu khác nhau.
+- `--out-dir`: thư mục lưu output (mặc định thư mục hiện tại).
+- `--report`: tên file Markdown report (để trống `""` nếu không cần).
+
+**Output sinh ra**:
+- In bảng tổng hợp accuracy/invalid-rate/latency/cost ra console.
+- `summary_metrics.csv` — metrics tổng hợp theo từng variant.
+- `pairwise_comparison.csv` — win/loss/tie, McNemar p-value, bootstrap CI giữa baseline và từng biến thể còn lại.
+- `report.md` (tùy chọn) — báo cáo Markdown đầy đủ kèm phân tích lỗi (câu được sửa đúng / bị hồi quy so với baseline).
+- `full_results.json` — toàn bộ kết quả raw để debug/phân tích thêm.
+
+> Lưu ý: giá cost trong `MODEL_PRICING_PER_1M_TOKENS` (đầu file `evaluate.py`) đang để trống — chỉnh lại theo model bạn dùng nếu muốn script tự ước tính chi phí (khi không có, cột cost hiển thị `N/A`, trừ khi prediction đã có sẵn `estimated_cost` từ `pricing` trong config YAML).
 
 ---
 
-## 📊 6. Ý Nghĩa Của Tệp Output & Dữ Liệu Kết Quả
+## 🔄 6. Luồng Hoạt Động Của Hệ Thống (System Execution Flow)
+
+Hệ thống hoạt động theo mô hình **Controller Loop** được quản lý trong `core/runner.py`. Từ V2-QR/V3-QR trở đi, pipeline theo kiểu **Query-First**: Query Rewriter luôn chạy ĐẦU mỗi iteration (kể cả iteration 1, để hình thành query ban đầu từ câu hỏi gốc) chứ không phải chỉ sau khi Verifier từ chối:
+
+```mermaid
+flowchart TD
+    A[Bắt đầu Episode hoặc Lượt Chat] --> B[Nạp Ngữ Cảnh Bộ Nhớ: STM và LTM]
+    B --> C{Bắt đầu Iteration 1..N}
+    C --> D{Query Rewriter Enabled?}
+    D -- Có --> E["Sinh/viết lại retrieval_query<br/>iter 1: từ question gốc<br/>iter 2+: từ evidence thất bại + lý do reject"]
+    D -- Không --> F{Retrieval Enabled?}
+    E --> F
+    F -- Có --> G[Query Chroma bằng retrieval_query, lấy Evidence]
+    F -- Không --> H[Reasoning Stage]
+    G --> H
+    H --> I["Tạo Draft Answer + Explanation + Confidence<br/>luôn dùng question gốc"]
+    I --> J{Verifier Enabled?}
+    J -- Không --> Z[Trả về Kết Quả Cuối Cùng]
+    J -- Có --> K[Verifier Stage: Fact-check Draft Answer]
+    K --> L{Verdict == supported?}
+    L -- Supported --> Z
+    L -- Unsupported --> M["Lưu evidence thất bại + lý do reject vào context<br/>ghi loop_scratchpad nếu STM scope loop bật"]
+    M --> N{Chạm max_iterations?}
+    N -- Chưa --> C
+    N -- Rồi --> Z
+```
+
+### Chi tiết các bước thực hiện trong mỗi iteration:
+1. **Memory Context Preparation** (1 lần/episode, trước vòng lặp):
+   - Truy xuất các **LTM facts** tương quan từ ChromaDB.
+   - Nạp lịch sử **STM session** gần nhất.
+2. **Query Rewriter Stage** (nếu bật, chạy đầu mỗi iteration):
+   - Iteration 1: hình thành `retrieval_query` ban đầu từ câu hỏi gốc (evidence còn rỗng).
+   - Iteration 2+: viết lại query dựa trên evidence thất bại + lý do reject của Verifier.
+   - `question` gốc không bao giờ bị ghi đè, chỉ `retrieval_query` thay đổi.
+3. **Retrieval Stage**: nếu bật, gọi mô hình nhúng (`_embed_query`) để chuyển `retrieval_query` (hoặc `question` nếu không có Query Rewriter) thành vector, Semantic Search trên ChromaDB lấy top-k bằng chứng y khoa.
+4. **Reasoning Stage**: đưa prompt (câu hỏi gốc, lựa chọn A-B-C-D, evidence, lịch sử bộ nhớ...) vào Reasoning LLM, trích JSON `answer` / `explanation` / `confidence`.
+5. **Verifier Stage** (nếu bật): Verifier LLM fact-check draft answer so với evidence.
+   - `verdict = supported` → dừng vòng lặp, trả kết quả ngay.
+   - `verdict = unsupported` → lưu evidence + lý do reject vào context cho iteration sau, ghi `loop_scratchpad` nếu STM scope `loop`/`both` đang bật, rồi lặp lại từ bước 2 cho đến khi `supported` hoặc chạm `max_iterations`.
+   - Không có Verifier → dừng sau 1 iteration duy nhất (hành vi của V0/V1).
+
+---
+
+## 📊 7. Ý Nghĩa Của Tệp Output & Dữ Liệu Kết Quả
 
 Khi chạy ở chế độ **Benchmark**, kết quả sẽ được ghi vào các tệp `.jsonl` trong thư mục `output/` (ví dụ: `output/predictions_v3-qr_1785430074.jsonl`).
 
@@ -251,14 +282,14 @@ Mỗi tệp JSONL bao gồm **Phần Header Metadata** ở đầu tệp và **C�
 ```text
 # ============================================================
 # MED-AI predictions — variant=v3-qr
-# generated_at: 1785430074
-# model: deepseek/deepseek-v4-flash
-# split: test  limit: 20
-# pipeline: retrieval(top_k=5) -> reasoning -> verifier(max_iterations=3) -> query_rewriter
-# memory: LTM(read_only)
+# generated_at: 1788608766
+# models: query_rewriter: deepseek/deepseek-v4-flash, retrieval: bge-m3, reasoning: deepseek/deepseek-v4-flash, verifier: deepseek/deepseek-v4-flash
+# split: train  limit: 10
+# pipeline: query_rewriter -> retrieval(top_k=5) -> reasoning -> verifier(max_iterations=3)
+# memory: STM(scope=loop) + LTM(mode=read_only)
 # ============================================================
 ```
-- Giúp người dùng biết chính xác phiên bản cấu hình (`variant`), thời gian chạy, mô hình LLM được sử dụng, sơ đồ pipeline và trạng thái bộ nhớ.
+- Giúp người dùng biết chính xác phiên bản cấu hình (`variant`), thời gian chạy, model LLM dùng cho từng agent trong pipeline (`models`), sơ đồ pipeline và trạng thái bộ nhớ. Khi không bật memory, dòng `memory` sẽ là `OFF`.
 
 ---
 
@@ -293,15 +324,17 @@ Tất cả các phiên bản (V0 đến V3) đều tuân theo một Schema chu�
 | **`query_rewrite_count`** | `int \| null` | Số lần Query Rewriter đã thực hiện viết lại câu hỏi. | V2-QR, V3-QR |
 | **`rewriter_latency_ms`** | `float \| null` | Tổng thời gian thực thi của Query Rewriter Stage. | V2-QR, V3-QR |
 | **`rewriter_token_usage`** | `dict \| null` | Tổng token sử dụng riêng cho Query Rewriter Stage. | V2-QR, V3-QR |
-| **`stm_scope_used`** | `str \| null` | Phạm vi bộ nhớ ngắn hạn được áp dụng (`"loop"`, `"session"`, hoặc `"both"`). | V3 |
-| **`loop_history_length`** | `int \| null` | Số lượng ghi chú lịch sử vòng lặp được giữ trong ngữ cảnh. | V2, V3 |
-| **`ltm_facts_retrieved`** | `list[str] \| null` | Danh sách các thông tin tiền sử/dữ kiện bệnh nhân được trích xuất từ LTM. | V3 (Chat/Benchmark) |
-| **`ltm_write_triggered`** | `bool \| null` | `true` nếu lượt hội thoại này kích hoạt việc ghi dữ kiện mới vào LTM. | V3 (Chat Mode) |
-| **`user_id`** | `str \| null` | Định danh người dùng phục vụ phân tách bộ nhớ LTM. | V3 |
+| **`stm_scope_used`** | `str \| null` | Dự trữ cho phạm vi STM (`"loop"`, `"session"`, `"both"`). ⚠️ `runner.py` hiện chưa gán giá trị này — luôn `null` trong output. | V3 (chưa populate) |
+| **`loop_history_length`** | `int \| null` | Số lượng ghi chú lịch sử vòng lặp (`loop_scratchpad`) được giữ trong ngữ cảnh. | V2, V3 |
+| **`ltm_facts_retrieved`** | `list[str] \| null` | Dự trữ cho danh sách fact LTM đã truy xuất. ⚠️ `runner.py` hiện chưa gán giá trị này — luôn `null` trong output. | V3 (chưa populate) |
+| **`ltm_write_triggered`** | `bool \| null` | Dự trữ cho cờ báo có ghi fact mới vào LTM hay không. ⚠️ `runner.py` hiện chưa gán giá trị này — luôn `null` trong output. | V3 (chưa populate) |
+| **`user_id`** | `str \| null` | Dự trữ cho định danh người dùng phục vụ phân tách LTM. ⚠️ `runner.py` hiện chưa gán giá trị này — luôn `null` trong output. | V3 (chưa populate) |
+
+> Ghi chú: 4 trường trên nằm sẵn trong schema `EpisodeResult` để dùng cho tương lai, nhưng `Runner.run_episode` (`core/runner.py`) hiện không set giá trị cho chúng — quan sát trực tiếp trong các file `.jsonl` ở `output/` sẽ luôn thấy `null` dù STM/LTM đang bật. Thông tin LTM/STM thực tế của chat mode (fact truy xuất, có ghi mới hay không...) hiện chỉ được in ra qua `logger.memory_info()` ở console, chưa được lưu vào output JSONL.
 
 ---
 
-## 💡 7. Ghi Chú Phát Triển (Development Notes)
+## 💡 8. Ghi Chú Phát Triển (Development Notes)
 
 - **Mở rộng Stage mới**: Bạn có thể tạo thêm các Stage tùy chỉnh bằng cách kế thừa `BaseStage` trong `stages/base.py` và đăng ký vào `_STAGE_CLASSES` trong `core/runner.py`.
 - **Chế độ Trace Log Chi Tiết**: Khi đặt `debug: verbose` trong tệp YAML config, ứng dụng sẽ tạo thêm tệp `trace_<variant>_<timestamp>.jsonl` chứa toàn bộ prompt thô, raw LLM response và context ở từng bước để hỗ trợ công tác debug.

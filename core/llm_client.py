@@ -17,5 +17,8 @@ def build_llm(
     kwargs = {"seed": seed} if seed is not None else {}
     return ChatOpenAI(
         model=model, base_url=base_url, api_key=api_key,
-        temperature=temperature, **kwargs,
+        temperature=temperature,
+        # Tắt hidden chain-of-thought (giảm latency ~50-60% cho các stage chỉ cần JSON ngắn).
+        model_kwargs={"extra_body": {"thinking": {"type": "disabled"}}},
+        **kwargs,
     )
