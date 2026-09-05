@@ -29,7 +29,9 @@ class RetrievalStage(BaseStage):
 
     def run(self, context: dict[str, Any]) -> StageOutput:
         start = time.time()
-        query = context.get("question", "")
+        # Ưu tiên retrieval_query (do QR sinh ra) nếu có; fallback về question gốc.
+        # Backward compatible: v0/v1/v2 không set retrieval_query → dùng question như cũ.
+        query = context.get("retrieval_query") or context.get("question", "")
         results = self.retriever.query(query, top_k=self.top_k)
         latency_ms = (time.time() - start) * 1000
 

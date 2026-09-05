@@ -1,38 +1,17 @@
 #!/usr/bin/env python3
-"""
-evaluate.py — Script đánh giá hệ thống Multi-Agent LLM cho MedQA-USMLE
-========================================================================
+"""evaluate.py — Đánh giá hệ thống Multi-Agent LLM cho MedQA-USMLE.
 
-Đọc các file prediction (.jsonl) do từng biến thể hệ thống (V0, V1, V2, V3, V3-qr, V4...)
-sinh ra, tính toán đầy đủ các chỉ số theo yêu cầu đề bài (mục 5 - Metrics):
-
-    - Accuracy = số câu đúng / tổng số câu
-    - Invalid response rate = tỷ lệ câu trả lời không hợp lệ
-    - Accuracy gain = Accuracy(variant) - Accuracy(baseline)
-    - Win / Loss / Tie giữa 2 biến thể (so từng câu)
-    - McNemar's test (kiểm định có ý nghĩa thống kê giữa 2 biến thể)
-    - Bootstrap 95% CI cho accuracy và cho accuracy gain
-    - Cost & latency (tổng token, ước tính chi phí, độ trễ trung bình/median)
+Đọc các file prediction (.jsonl) do từng biến thể (V0, V1, V2, V3, V3-qr...) sinh ra,
+tính accuracy, invalid rate, accuracy gain, win/loss/tie, McNemar's test, bootstrap
+95% CI, cost & latency.
 
 USAGE
 -----
-    # Chỉ định file cụ thể
     python evaluate.py --files predictions_v0.jsonl predictions_v3-qr.jsonl
+    python evaluate.py --dir ./predictions --baseline v0 --report report.md
 
-    # Hoặc để script tự quét thư mục (mặc định ./predictions hoặc thư mục hiện tại)
-    python evaluate.py --dir ./predictions
-
-    # Chỉ định biến thể nào là baseline (mặc định: variant có tên chứa "v0")
-    python evaluate.py --dir . --baseline v0
-
-    # Xuất thêm báo cáo Markdown
-    python evaluate.py --dir . --report report.md
-
-Output:
-    - In bảng tổng hợp ra console
-    - Lưu summary_metrics.csv (accuracy, invalid rate, cost, latency... theo từng variant)
-    - Lưu pairwise_comparison.csv (win/loss/tie, McNemar, bootstrap CI giữa các cặp)
-    - (tuỳ chọn) report.md — báo cáo Markdown format đẹp để đưa thẳng vào report
+Output: bảng tổng hợp ra console + summary_metrics.csv + pairwise_comparison.csv
++ report.md (tuỳ chọn) + full_results.json.
 """
 
 from __future__ import annotations
@@ -60,8 +39,7 @@ MODEL_PRICING_PER_1M_TOKENS: dict[str, dict[str, float]] = {
     # "gpt-4o-mini": {"input": 0.15, "output": 0.60},
 }
 
-VALID_ANSWERS = {"A", "B", "C", "D", "E"}  # MedQA-USMLE chuẩn là 4 đáp án A-D,
-                                             # để E dự phòng nếu dataset mở rộng.
+VALID_ANSWERS = {"A", "B", "C", "D", "E"}  # 4 đáp án chuẩn A-D, E dự phòng nếu dataset mở rộng
 
 N_BOOTSTRAP = 10_000
 RANDOM_SEED = 42
@@ -124,19 +102,8 @@ class VariantData:
 # ---------------------------------------------------------------------------
 
 def parse_header_comments(lines: list[str]) -> dict:
-    """
-    Các file prediction có header dạng comment '#':
-        # ============================================================
-        # MED-AI predictions — variant=v3-qr
-        # generated_at: 1785466972
-        # models: retrieval: bge-m3, reasoning: deepseek/deepseek-v4-flash, ...
-        # split: test  limit: 500
-        # pipeline: retrieval(top_k=5) -> reasoning -> verifier(...) -> query_rewriter
-        # memory: STM(scope=loop) + LTM(mode=read_only)
-        # ============================================================
-    Trích xuất các dòng này thành dict metadata để hiển thị trong report,
-    không bắt buộc phải có — nếu thiếu, trả về dict rỗng.
-    """
+    """Parse các dòng header dạng '# key: value' (do PredictionWriter ghi) thành dict
+    metadata để hiển thị trong report. Không bắt buộc phải có — thiếu thì trả dict rỗng."""
     meta: dict[str, str] = {}
     for line in lines:
         line = line.strip()
@@ -258,13 +225,8 @@ def estimate_cost(record: Record) -> Optional[float]:
 
 
 def limit_to_first_n_questions(variants: dict[str, "VariantData"], n: int) -> None:
-    """
-    Cắt MỌI biến thể trong `variants` xuống chỉ còn N câu hỏi đầu tiên, chọn theo
-    question_id sắp xếp tăng dần trên HỢP các question_id xuất hiện ở bất kỳ biến thể nào
-    (đảm bảo dùng đúng 1 bộ ID chung, không phải "N dòng đầu của mỗi file" một cách độc lập —
-    vì thứ tự dòng có thể lệch nhau giữa các file).
-    Sửa trực tiếp (in-place) từng VariantData.records.
-    """
+    """Cắt MỌI biến thể xuống N question_id đầu tiên (sắp theo hợp các ID xuất hiện ở
+    bất kỳ biến thể nào, không phải N dòng đầu của mỗi file độc lập). Sửa in-place."""
     all_ids: set[str] = set()
     for vdata in variants.values():
         all_ids |= set(vdata.records.keys())
@@ -288,12 +250,9 @@ def limit_to_first_n_questions(variants: dict[str, "VariantData"], n: int) -> No
 
 
 def compute_variant_summary(vdata: VariantData, official_n: Optional[int] = None) -> dict:
-    """
-    Tính các chỉ số tổng hợp cho 1 biến thể.
-    official_n: nếu truyền vào (vd 1273 cho MedQA-USMLE full test set), dùng làm mẫu số
-                chính thức cho accuracy thay vì len(records) — hữu ích khi 1 biến thể
-                bị thiếu vài câu (lỗi API...) nhưng vẫn muốn accuracy tính trên full set.
-    """
+    """Tính các chỉ số tổng hợp cho 1 biến thể. `official_n` (vd 1273 cho MedQA-USMLE
+    full test set) dùng làm mẫu số accuracy thay vì len(records), khi biến thể thiếu
+    vài câu nhưng vẫn muốn tính trên full set."""
     recs = list(vdata.records.values())
     n_total = len(recs)
     denom = official_n if official_n else n_total
@@ -342,14 +301,8 @@ def compute_variant_summary(vdata: VariantData, official_n: Optional[int] = None
 # ---------------------------------------------------------------------------
 
 def aligned_correctness(a: VariantData, b: VariantData) -> tuple[list[str], np.ndarray, np.ndarray]:
-    """
-    Lấy giao (intersection) question_id giữa 2 biến thể, trả về:
-        - danh sách question_id chung
-        - mảng đúng/sai (1/0) của a theo đúng thứ tự đó
-        - mảng đúng/sai (1/0) của b theo đúng thứ tự đó
-    Cảnh báo nếu 2 tập câu hỏi không trùng khớp hoàn toàn (thường không nên xảy ra
-    vì đề bài yêu cầu chạy cùng 1 test set cho mọi biến thể).
-    """
+    """Lấy giao question_id giữa 2 biến thể, trả về (id chung, mảng đúng/sai của a,
+    mảng đúng/sai của b) theo cùng thứ tự. Cảnh báo nếu 2 tập câu hỏi lệch nhau."""
     ids_a, ids_b = set(a.records), set(b.records)
     common = sorted(ids_a & ids_b, key=lambda x: (len(x), x))
 
@@ -365,16 +318,8 @@ def aligned_correctness(a: VariantData, b: VariantData) -> tuple[list[str], np.n
 
 
 def mcnemar_test(correct_a: np.ndarray, correct_b: np.ndarray) -> dict:
-    """
-    McNemar's test cho dữ liệu ghép cặp (paired) nhị phân đúng/sai.
-    Bảng 2x2:
-                    B đúng      B sai
-        A đúng        n11         n10   (b = n10: A đúng, B sai)
-        A sai         n01         n00   (c = n01: A sai, B đúng)
-
-    Dùng exact binomial test trên (b, c) khi b + c nhỏ (< 25, khuyến nghị chuẩn),
-    dùng chi-square (with continuity correction) khi b + c lớn.
-    """
+    """McNemar's test cho dữ liệu ghép cặp đúng/sai: b = A đúng B sai, c = A sai B đúng.
+    Dùng exact binomial khi b+c < 25, dùng chi-square (continuity correction) khi lớn hơn."""
     b = int(np.sum((correct_a == 1) & (correct_b == 0)))  # A đúng, B sai
     c = int(np.sum((correct_a == 0) & (correct_b == 1)))  # A sai, B đúng
     n_disagree = b + c
@@ -416,11 +361,8 @@ def bootstrap_accuracy_gain_ci(
     seed: int = RANDOM_SEED,
     alpha: float = 0.05,
 ) -> dict:
-    """
-    Bootstrap CI cho accuracy của từng biến thể và cho gain = acc(b) - acc(a).
-    Resample theo cặp (paired bootstrap): mỗi lần lấy mẫu lại index câu hỏi có hoàn lại,
-    giữ nguyên cặp (a_i, b_i) để bảo toàn tương quan giữa 2 hệ thống trên cùng câu hỏi.
-    """
+    """Bootstrap CI cho accuracy từng biến thể và cho gain = acc(b) - acc(a).
+    Paired bootstrap: resample index câu hỏi có hoàn lại, giữ nguyên cặp (a_i, b_i)."""
     rng = np.random.default_rng(seed)
     n = len(correct_a)
     if n == 0:
