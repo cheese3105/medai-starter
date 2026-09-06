@@ -1,6 +1,6 @@
 # V1 — LLM + RAG: retrieval cung cấp evidence cho reasoning
 variant: "v1"
-debug: "info"
+debug: "verbose"
 seed: null
 
 pipeline:

@@ -69,9 +69,10 @@ class EpisodeResult:
     reasoning_token_usage: Optional[dict[str, int]] = None
     verifier_latency_ms: Optional[float] = None
     verifier_token_usage: Optional[dict[str, int]] = None
-    query_rewrite_count: Optional[int] = None
+    query_rewrite_count: Optional[int] = None        # số lần QR chạy sau failed verification (retry only)
     rewriter_latency_ms: Optional[float] = None
     rewriter_token_usage: Optional[dict[str, int]] = None
+    initial_query_generated: Optional[bool] = None  # True nếu QR chạy ở iter 1 (initial query formulation)
 
     # Nhóm D: từ V3 (memory)
     stm_scope_used: Optional[str] = None
