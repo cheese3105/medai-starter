@@ -1,5 +1,8 @@
 # MED-AI — Framework Đánh Giá & Chat Y Khoa Đa Tầng (V0 - V3)
 
+Prompt-injection attack benchmarking is documented in
+[`attack/README.md`](attack/README.md).
+
 MED-AI là một framework thử nghiệm và đánh giá các hệ thống trí tuệ nhân tạo y khoa theo kiến trúc **Modular Pipeline & Multi-Agent**. Hệ thống được thiết kế để đo lường, so sánh hiệu năng qua từng giai đoạn tiến hoá (từ V0 đến V3), hỗ trợ cả chế độ đánh giá tự động (Benchmark trên bộ dữ liệu **MedQA-USMLE**) và chế độ trò chuyện tương tác (Interactive Chat REPL).
 
 ---

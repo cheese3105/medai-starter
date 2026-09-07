@@ -18,7 +18,8 @@ def build_llm(
     return ChatOpenAI(
         model=model, base_url=base_url, api_key=api_key,
         temperature=temperature,
-        # Tắt hidden chain-of-thought (giảm latency ~50-60% cho các stage chỉ cần JSON ngắn).
-        model_kwargs={"extra_body": {"thinking": {"type": "disabled"}}},
+        timeout=10.0,
+        max_retries=2,
+        extra_body={"reasoning": {"effort": "none"}},
         **kwargs,
     )

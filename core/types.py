@@ -17,6 +17,7 @@ class EpisodeInput:
     question: str
     choices: list[str] = field(default_factory=list)
     gold_answer: Optional[str] = None
+    external_source: str = ""
 
 
 @dataclass
@@ -67,6 +68,7 @@ class EpisodeResult:
     stopped_after_max_iterations: Optional[bool] = None
     reasoning_latency_ms: Optional[float] = None
     reasoning_token_usage: Optional[dict[str, int]] = None
+    reasoning_raw_response: Optional[str] = None
     verifier_latency_ms: Optional[float] = None
     verifier_token_usage: Optional[dict[str, int]] = None
     query_rewrite_count: Optional[int] = None        # số lần QR chạy sau failed verification (retry only)
