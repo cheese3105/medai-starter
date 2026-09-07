@@ -14,7 +14,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Benchmark prompt injection attacks on MED-AI")
     parser.add_argument("--target-config", default="attack/configs/v0-attack.yaml")
     parser.add_argument("--attacks", nargs="+", choices=sorted(ATTACKS), default=list(ATTACKS))
-    parser.add_argument("--tasks", nargs="+", choices=["sentiment", "spam"], default=["sentiment", "spam"])
+    parser.add_argument(
+        "--tasks", nargs="+",
+        choices=["sentiment", "spam", "duplicate", "hate", "nli"],
+        default=["sentiment", "spam", "duplicate", "hate", "nli"],
+    )
     parser.add_argument("--split", default="test")
     parser.add_argument("--target-limit", type=int, default=8)
     parser.add_argument("--injected-limit", type=int, default=8)

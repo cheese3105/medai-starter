@@ -5,8 +5,10 @@ This directory contains the small attack-only benchmark described in
 
 The initial version provides:
 
-- Naive and Combined prompt-injection attacks;
-- remote/cached SST-2 sentiment and UCI SMS Spam datasets;
+- all five paper attacks: Naive, Escape Characters, Context Ignoring, Fake
+  Completion, and Combined;
+- five remote/cached classification tasks: SST-2 sentiment, UCI SMS Spam, MRPC
+  duplicate detection, HSOL hate detection, and RTE natural-language inference;
 - deterministic pair sampling;
 - PNA-T, PNA-I, Attack Success Value, and Matching Rate;
 - selectable MED-AI YAML configuration with reasoning-only `external_source`.
@@ -16,8 +18,8 @@ Run the V0 smoke benchmark:
 ```bash
 .venv/bin/python -m attack.cli \
   --target-config attack/configs/v0-attack.yaml \
-  --attacks naive combined \
-  --tasks sentiment spam \
+  --attacks naive escape_characters context_ignoring fake_completion combined \
+  --tasks sentiment spam duplicate hate nli \
   --target-limit 8 \
   --injected-limit 8 \
   --sample-size 8 \
@@ -27,7 +29,9 @@ Run the V0 smoke benchmark:
 
 This makes live model calls. Hugging Face `datasets` downloads the datasets on
 the first run and reuses its local cache on later runs. Sentiment uses
-`stanfordnlp/sst2` validation data; spam uses `ucirvine/sms_spam` train data.
+`stanfordnlp/sst2` validation data; spam uses `ucirvine/sms_spam` train data;
+duplicate detection uses the MRPC validation split; hate detection uses the
+HSOL train split; and NLI uses the RTE train split.
 
 `--injected-limit` selects the PNA-I examples for each injected task.
 `--sample-size` separately controls how many target/injected pairs are attacked.
