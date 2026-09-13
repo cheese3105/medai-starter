@@ -1,11 +1,11 @@
-"""Script chạy tự động toàn bộ suite benchmark (V1 -> V3-qr) trên 200 câu test set.
+"""Script chạy tự động toàn bộ suite benchmark (V0 -> V3-qr) trên MedQA-USMLE test set.
 Đo chính xác thời gian thực thi (wall-clock time), accuracy và xuất báo cáo so sánh.
 """
 
 import sys
 import time
-import json
 import subprocess
+import argparse
 from pathlib import Path
 
 # Fix Windows encoding
@@ -18,31 +18,31 @@ from core.config import load_config
 from modes.benchmark import run_benchmark
 
 VARIANTS = [
+    ("v0", "configs/v0.yaml"),
+    ("v1", "configs/v1.yaml"),
     ("v2-qr", "configs/v2-qr.yaml"),
     ("v3-qr", "configs/v3-qr.yaml"),
 ]
 
-# Baseline V0 & V1 đã chạy xong 200/200 câu trước đó
-V0_FILE = "output/predictions_v0_1789294527.jsonl"
-V0_TIME_STR = "3m 04s"
-V0_ACC = "89.0%"
-
-V1_FILE = "output/predictions_v1_1789296941.jsonl"
-V1_TIME_STR = "3m 58s"
-V1_ACC = "82.5%"
-
 def main():
+    parser = argparse.ArgumentParser(description="Chạy tự động toàn bộ Benchmark Suite (V0 -> V3-QR)")
+    parser.add_argument("--limit", type=int, default=200, help="Số câu hỏi chạy cho mỗi biến thể (mặc định: 200)")
+    parser.add_argument("--workers", type=int, default=8, help="Số worker chạy song song (mặc định: 8)")
+    parser.add_argument("--split", default="test", choices=["test", "train", "dev"], help="Dataset split (mặc định: test)")
+    parser.add_argument("--report", default="BENCHMARK_REPORT_OPTIMIZED.md", help="Tên file markdown xuất báo cáo")
+    args = parser.parse_args()
+
     suite_start = time.time()
     results = []
 
     print("=" * 60)
-    print("MED-AI BENCHMARK SUITE — 200 CÂU TEST SET (8 WORKERS)")
-    print("Mô hình: Reasoning=deepseek-v4-flash, Embedding=baai/bge-m3")
+    print(f"MED-AI BENCHMARK SUITE — {args.limit} CÂU ({args.split.upper()} SET)")
+    print(f"Cấu hình: workers={args.workers}, split={args.split}")
     print("=" * 60)
 
     for var_name, cfg_path in VARIANTS:
         print(f"\n{'#' * 60}")
-        print(f"# BẮT ĐẦU CHẠY: {var_name.upper()} (split=test, limit=200, workers=8)")
+        print(f"# BẮT ĐẦU CHẠY: {var_name.upper()} (split={args.split}, limit={args.limit}, workers={args.workers})")
         print(f"{'#' * 60}\n")
         
         t0 = time.time()
@@ -50,10 +50,10 @@ def main():
             cfg = load_config(cfg_path)
             res = run_benchmark(
                 config=cfg,
-                split="test",
-                limit=200,
+                split=args.split,
+                limit=args.limit,
                 output_path=None,
-                workers=8,
+                workers=args.workers,
             )
             elapsed = time.time() - t0
             res["elapsed_sec"] = elapsed
@@ -72,23 +72,27 @@ def main():
     print("=" * 60)
     print(f"{'Variant':<10} | {'Total':<6} | {'Correct':<8} | {'Accuracy':<10} | {'Thời gian chạy':<15} | Output File")
     print("-" * 80)
-    print(f"{'v0':<10} | {'200':<6} | {'178':<8} | {V0_ACC:<10} | {V0_TIME_STR:<15} | {V0_FILE}")
-    print(f"{'v1':<10} | {'200':<6} | {'165':<8} | {V1_ACC:<10} | {V1_TIME_STR:<15} | {V1_FILE}")
     for r in results:
         print(f"{r['variant']:<10} | {r['total']:<6} | {r['correct']:<8} | {r['accuracy']:.1%}{'':<4} | {r['elapsed_str']:<15} | {r['output_file']}")
     print("-" * 80)
-    print(f"Tổng thời gian chạy đợt này: {total_min}m {total_sec:02d}s\n")
+    print(f"Tổng thời gian toàn bộ suite: {total_min}m {total_sec:02d}s\n")
 
     # Chạy evaluate.py để tính thống kê và tạo báo cáo
-    files_to_eval = [V0_FILE, V1_FILE] + [r["output_file"] for r in results if "output_file" in r]
-    print(f"Đang chạy evaluate.py trên {len(files_to_eval)} files...")
-    cmd = [sys.executable, "../evaluate.py", "--files"] + files_to_eval + ["--report", "BENCHMARK_REPORT_OPTIMIZED.md"]
-    try:
-        subprocess.run(cmd, check=True)
-        print("\nĐã tạo thành công báo cáo chi tiết: BENCHMARK_REPORT_OPTIMIZED.md")
-    except Exception as e:
-        print(f"Lỗi khi chạy evaluate.py: {e}")
+    files_to_eval = [r["output_file"] for r in results if "output_file" in r and r["output_file"]]
+    if files_to_eval:
+        print(f"Đang chạy evaluate.py trên {len(files_to_eval)} files...")
+        eval_script = Path("evaluate/evaluate.py")
+        if not eval_script.exists():
+            eval_script = Path("../evaluate.py")
+        
+        cmd = [sys.executable, str(eval_script), "--files"] + files_to_eval + ["--report", args.report]
+        try:
+            subprocess.run(cmd, check=True)
+            print(f"\nĐã tạo thành công báo cáo chi tiết: {args.report}")
+        except Exception as e:
+            print(f"Lỗi khi chạy evaluate.py: {e}")
+    else:
+        print("Không có file kết quả hợp lệ để đánh giá.")
 
 if __name__ == "__main__":
     main()
-
