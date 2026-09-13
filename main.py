@@ -8,6 +8,12 @@ Usage:
 import argparse
 import sys
 
+# Fix Windows console encoding
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 from core.config import load_config
 
 
@@ -23,6 +29,8 @@ def main():
                         help="Giới hạn số câu hỏi (benchmark only)")
     parser.add_argument("--output", default=None,
                         help="Đường dẫn file output JSONL (benchmark only)")
+    parser.add_argument("--workers", type=int, default=8,
+                        help="Số worker chạy song song (benchmark only, mặc định: 8)")
 
     args = parser.parse_args()
 
@@ -39,6 +47,7 @@ def main():
             split=args.split,
             limit=args.limit,
             output_path=args.output,
+            workers=args.workers,
         )
     elif args.mode == "chat":
         from modes.chat import run_chat
