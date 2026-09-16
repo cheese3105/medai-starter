@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -98,6 +99,7 @@ class PredictionWriter:
         self.path = Path(output_path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.touch(exist_ok=True)
+        self._lock = threading.Lock()
 
     def write_header(self, summary: dict[str, Any]) -> None:
         """Header dạng comment ở đầu file, để biết file chạy bằng config gì."""
@@ -111,9 +113,11 @@ class PredictionWriter:
             f"# memory: {summary.get('memory_summary')}",
             "# " + "=" * 60,
         ]
-        with open(self.path, "a", encoding="utf-8") as f:
-            f.write("\n".join(lines) + "\n")
+        with self._lock:
+            with open(self.path, "a", encoding="utf-8") as f:
+                f.write("\n".join(lines) + "\n")
 
     def write(self, result: EpisodeResult) -> None:
-        with open(self.path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(asdict(result), ensure_ascii=False) + "\n")
+        with self._lock:
+            with open(self.path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(asdict(result), ensure_ascii=False) + "\n")

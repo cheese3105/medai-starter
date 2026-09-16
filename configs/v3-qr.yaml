@@ -1,7 +1,7 @@
 # V3 + Query Rewriter — so sánh trực tiếp với v3.yaml (không có rewriter)
 # Pipeline: query_rewriter → retrieval → reasoning → verifier [→ query_rewriter nếu unsupported]
 variant: "v3-qr"
-debug: "verbose"
+debug: "off"
 seed: null
 
 pipeline:

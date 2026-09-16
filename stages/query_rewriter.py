@@ -30,12 +30,16 @@ class QueryRewriterStage(BaseStage):
 
     def __init__(self, run_config: RunConfig, stage_config: StageConfig):
         super().__init__(run_config, stage_config)
+        enable_reasoning = stage_config.extra.get("reasoning", False)
+        reasoning_effort = stage_config.extra.get("reasoning_effort", None)
         self.llm = build_llm(
             model=run_config.query_rewriter_model,
             base_url=run_config.query_rewriter_base_url,
             api_key=run_config.query_rewriter_api_key,
             temperature=0.0,
             seed=run_config.seed,
+            enable_reasoning=enable_reasoning,
+            reasoning_effort=reasoning_effort,
         )
 
     def run(self, context: dict[str, Any]) -> StageOutput:
