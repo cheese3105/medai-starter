@@ -54,10 +54,8 @@ class QueryRewriterStage(BaseStage):
         try:
             parsed = _extract_json(raw_text)
             rewritten = parsed.get("rewritten_query", "").strip()
-            reasoning = parsed.get("reasoning", "")
         except (ValueError, json.JSONDecodeError):
             rewritten = ""
-            reasoning = ""
 
         # Fallback: nếu rewriter không trả query hợp lệ, giữ nguyên query cũ
         if not rewritten:
@@ -67,7 +65,6 @@ class QueryRewriterStage(BaseStage):
             stage_name="query_rewriter",
             data={
                 "rewritten_query": rewritten,
-                "reasoning": reasoning,
                 "raw_response": raw_text,
                 "prompt": prompt,
             },

@@ -22,8 +22,7 @@ pipeline:
 
       Return JSON only:
       {{
-        "rewritten_query": "your search query (5-15 keywords)",
-        "reasoning": "brief reason why this query targets the needed knowledge"
+        "rewritten_query": "your search query (5-15 keywords)"
       }}
 
   - name: retrieval

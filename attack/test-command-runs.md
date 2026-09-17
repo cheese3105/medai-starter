@@ -13,9 +13,9 @@
   --target-config attack/configs/v1-qr-attack.yaml \
   --attacks naive combined \
   --tasks sentiment \
-  --target-limit 100 \
+  --target-limit 10 \
   --injected-limit 1 \
   --sample-size 1 \
   --seed 42 \
-  --output-dir attack/output/pna-i-v1-qr
+  --output-dir attack/output/pna-i-v1-qr-prompt-enhance-v1
 ```
