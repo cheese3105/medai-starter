@@ -80,10 +80,10 @@ def maybe_extract_and_save(ltm: LongTermMemory, user_message: str, assistant_mes
                            turn_id: str = "") -> None:
     """1 LLM call quyết định có đáng nhớ không, ghi nếu có."""
     try:
-        from core.llm_client import build_llm
+        from core.llm_client import build_llm, invoke_with_rate_limit_backoff
         llm = build_llm(model=model, base_url=base_url, api_key=api_key, temperature=0.0)
         prompt = EXTRACTION_PROMPT.format(user_message=user_message, assistant_message=assistant_message)
-        response = llm.invoke(prompt)
+        response = invoke_with_rate_limit_backoff(llm, prompt)
         match = re.search(r"\{.*\}", response.content.strip(), re.DOTALL)
         if not match:
             return

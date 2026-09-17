@@ -1,6 +1,6 @@
 # V1-QR prompt-injection config. external_source is exposed to reasoning only.
 variant: "v1-qr-attack"
-debug: "info"
+debug: "verbose"
 seed: null
 
 pipeline:

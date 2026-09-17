@@ -1,7 +1,7 @@
 # V3-QR prompt-injection config. The compromised external source is exposed
 # only to reasoning and remains present on every verifier retry.
 variant: "v3-qr-attack"
-debug: "info"
+debug: "verbose"
 seed: null
 
 pipeline:

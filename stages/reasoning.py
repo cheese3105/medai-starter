@@ -8,7 +8,7 @@ import time
 from typing import Any
 
 from core.config import RunConfig, StageConfig
-from core.llm_client import build_llm, extract_token_usage
+from core.llm_client import build_llm, extract_token_usage, invoke_with_rate_limit_backoff
 from core.types import StageOutput
 from stages.base import BaseStage
 
@@ -45,7 +45,7 @@ class ReasoningStage(BaseStage):
         start = time.time()
 
         prompt = self.stage_config.prompt_template.format_map(_SafeDict(context))
-        response = self.llm.invoke(prompt)
+        response = invoke_with_rate_limit_backoff(self.llm, prompt)
         latency_ms = (time.time() - start) * 1000
 
         token_usage = extract_token_usage(response)

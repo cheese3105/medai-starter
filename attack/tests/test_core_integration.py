@@ -6,7 +6,11 @@ from unittest.mock import patch
 
 from core.config import RunConfig, StageConfig
 from core.logger import DebugLogger
-from core.llm_client import build_llm, extract_token_usage
+from core.llm_client import (
+    build_llm,
+    extract_token_usage,
+    invoke_with_rate_limit_backoff,
+)
 from core.runner import Runner, _STAGE_CLASSES
 from core.types import EpisodeInput, StageOutput
 
@@ -113,6 +117,60 @@ class CoreIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(extract_token_usage(legacy_response), {"input": 7, "output": 2})
         self.assertEqual(extract_token_usage(SimpleNamespace()), {})
+
+    def test_rate_limit_backoff_retries_then_returns_response(self) -> None:
+        rate_limit_error = RuntimeError("rate limited")
+        rate_limit_error.status_code = 429
+        llm = SimpleNamespace()
+        llm.invoke = unittest.mock.Mock(
+            side_effect=[rate_limit_error, rate_limit_error, "success"]
+        )
+        sleeps = []
+
+        result = invoke_with_rate_limit_backoff(llm, "prompt", _sleep=sleeps.append)
+
+        self.assertEqual(result, "success")
+        self.assertEqual(llm.invoke.call_count, 3)
+        self.assertEqual(sleeps, [10.0, 20.0])
+
+    def test_rate_limit_backoff_honors_retry_after_header(self) -> None:
+        rate_limit_error = RuntimeError("rate limited")
+        rate_limit_error.status_code = 429
+        rate_limit_error.response = SimpleNamespace(
+            status_code=429, headers={"retry-after": "17"}
+        )
+        llm = SimpleNamespace()
+        llm.invoke = unittest.mock.Mock(side_effect=[rate_limit_error, "success"])
+        sleeps = []
+
+        result = invoke_with_rate_limit_backoff(llm, "prompt", _sleep=sleeps.append)
+
+        self.assertEqual(result, "success")
+        self.assertEqual(sleeps, [17.0])
+
+    def test_rate_limit_backoff_does_not_retry_other_errors(self) -> None:
+        llm = SimpleNamespace()
+        llm.invoke = unittest.mock.Mock(side_effect=ValueError("bad request"))
+        sleeps = []
+
+        with self.assertRaisesRegex(ValueError, "bad request"):
+            invoke_with_rate_limit_backoff(llm, "prompt", _sleep=sleeps.append)
+
+        self.assertEqual(llm.invoke.call_count, 1)
+        self.assertEqual(sleeps, [])
+
+    def test_rate_limit_backoff_raises_after_retries_are_exhausted(self) -> None:
+        rate_limit_error = RuntimeError("rate limited")
+        rate_limit_error.status_code = 429
+        llm = SimpleNamespace()
+        llm.invoke = unittest.mock.Mock(side_effect=rate_limit_error)
+        sleeps = []
+
+        with self.assertRaisesRegex(RuntimeError, "rate limited"):
+            invoke_with_rate_limit_backoff(llm, "prompt", _sleep=sleeps.append)
+
+        self.assertEqual(llm.invoke.call_count, 5)
+        self.assertEqual(sleeps, [10.0, 20.0, 40.0, 60.0])
 
     @patch("core.llm_client.ChatOpenAI")
     @patch.dict("os.environ", {"OPENROUTER_PROVIDER": "deepinfra"})

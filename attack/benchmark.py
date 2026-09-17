@@ -13,7 +13,7 @@ from attack.metrics import calculate_metrics
 from attack.sampling import sample_pairs
 from attack.tasks import InjectedExample, InjectedTask, load_tasks
 from core.config import RunConfig, load_config
-from core.llm_client import build_llm, extract_token_usage
+from core.llm_client import build_llm, extract_token_usage, invoke_with_rate_limit_backoff
 from core.logger import DebugLogger
 from core.runner import Runner
 from core.types import EpisodeInput
@@ -51,7 +51,9 @@ def invoke_injected_task(
                     enable_reasoning=reasoning.extra.get("reasoning", False),
                     reasoning_effort=reasoning.extra.get("reasoning_effort"))
     start = time.perf_counter()
-    response = llm.invoke(f"{task.instruction}\n\nInput:\n{example.text}")
+    response = invoke_with_rate_limit_backoff(
+        llm, f"{task.instruction}\n\nInput:\n{example.text}"
+    )
     latency_ms = (time.perf_counter() - start) * 1000
     return str(response.content), latency_ms, extract_token_usage(response)
 
