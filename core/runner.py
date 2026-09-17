@@ -98,6 +98,7 @@ class Runner:
         verdict_history: list[str] = []
         loop_scratchpad: list[str] = []
         final_answer, final_explanation, final_confidence = "INVALID", "", 0.0
+        reasoning_raw_response = ""
         stopped_early = False
 
         for iteration in range(1, self.max_iterations + 1):
@@ -143,12 +144,16 @@ class Runner:
                                       out.data.get("prompt", ""), out.data.get("raw_response", ""),
                                       out.data, out.latency_ms, out.token_usage)
 
-            # BƯỚC 3: Reasoning (luôn nhận question gốc)
+            # BƯỚC 3: Reasoning (luôn nhận question gốc). external_source chỉ
+            # được thêm vào context của reasoning, không lộ sang stage khác.
+            reasoning_context = dict(context)
+            reasoning_context["external_source"] = episode_input.external_source
             self.logger.stage_start(qid, iteration, "reasoning")
-            out = self.stages["reasoning"].run(context)
+            out = self.stages["reasoning"].run(reasoning_context)
             draft_answer = out.data.get("answer", "INVALID")
             draft_explanation = out.data.get("explanation", "")
             draft_confidence = out.data.get("confidence", 0.0)
+            reasoning_raw_response = out.data.get("raw_response", "")
             rsn_latency += out.latency_ms
             for k in ("input", "output"):
                 rsn_tokens[k] += out.token_usage.get(k, 0)
@@ -156,7 +161,7 @@ class Runner:
             self.logger.stage_end(qid, iteration, "reasoning", f'draft="{draft_answer}" (conf={draft_confidence:.2f})', out.latency_ms)
             if self.logger.verbose:
                 self.logger.trace(qid, iteration, "reasoning",
-                                  context["question"], context["choices"],
+                                  reasoning_context["question"], reasoning_context["choices"],
                                   out.data.get("prompt", ""), out.data.get("raw_response", ""),
                                   out.data, out.latency_ms, out.token_usage)
 
@@ -222,6 +227,7 @@ class Runner:
             verdict_history=verdict_history if verdict_history else None,
             stopped_after_max_iterations=stopped_early if self.has_verifier else None,
             reasoning_latency_ms=rsn_latency, reasoning_token_usage=rsn_tokens,
+            reasoning_raw_response=reasoning_raw_response,
             verifier_latency_ms=ver_latency if self.has_verifier else None,
             verifier_token_usage=ver_tokens if self.has_verifier else None,
             query_rewrite_count=rw_count if self.has_query_rewriter else None,

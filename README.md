@@ -1,5 +1,8 @@
 # MED-AI — Framework Đánh Giá & Chat Y Khoa Đa Tầng (V0 - V3)
 
+Prompt-injection attack benchmarking is documented in
+[`attack/README.md`](attack/README.md).
+
 MED-AI là một framework thử nghiệm và đánh giá các hệ thống trí tuệ nhân tạo y khoa theo kiến trúc **Modular Pipeline & Multi-Agent**. Hệ thống được thiết kế để đo lường, so sánh hiệu năng qua từng giai đoạn tiến hoá (từ V0 đến V3), hỗ trợ cả chế độ đánh giá tự động (Benchmark trên bộ dữ liệu **MedQA-USMLE**) và chế độ trò chuyện tương tác (Interactive Chat REPL).
 
 ---
@@ -27,7 +30,7 @@ Framework được thiết kế với 4 phiên bản kiến trúc chính:
 ## 📁 2. Cấu Trúc Thư Mục Project
 
 ```text
-medai/
+.
 ├── configs/                # Tệp cấu hình thí nghiệm YAML (v0.yaml -> v3-chat.yaml)
 │   ├── v0.yaml             # Config V0 Direct Reasoning
 │   ├── v1.yaml             # Config V1 RAG
@@ -60,8 +63,10 @@ medai/
 │   ├── verifier.py         # Stage kiểm chứng & phản biện
 │   └── query_rewriter.py   # Stage viết lại truy vấn tìm kiếm
 ├── .env.example            # Tệp mẫu khai báo biến môi trường
+├── evaluate.py             # Script đánh giá & kiểm định thống kê (McNemar, Bootstrap CI)
 ├── main.py                 # CLI Entrypoint chính của ứng dụng
 ├── pyrightconfig.json      # Cấu hình type-checking Python
+├── README_evaluate.md      # Hướng dẫn chi tiết đánh giá & so sánh biến thể
 └── requirements.txt        # Danh sách thư viện phụ thuộc
 ```
 
@@ -122,7 +127,7 @@ medai/
 Cơ sở dữ liệu ChromaDB đã được ingest sẵn: https://drive.google.com/file/d/1pIQYQ7CHJPbWqNW07kff5XA3YS8ER_Bb/view?usp=sharing
 
 Giải nén file zip dữ liệu đã xây dựng sẵn
-Copy đường dẫn `data/chroma/...` bỏ vào `medai/data/chroma/...`
+Copy thư mục `data/chroma/...` vào thư mục gốc của project: `data/chroma/...`
 
 ---
 
@@ -198,6 +203,30 @@ Trả lời: Cảm ơn bạn đã chia sẻ. Tôi đã ghi nhận thông tin b�
 Câu hỏi: Tôi đang bị đau họng, bác sĩ có thể kê đơn thuốc kháng sinh được không?
 Trả lời: Dựa trên tiền sử dị ứng Penicillin của bạn, chúng ta tuyệt đối không sử dụng nhóm kháng sinh Penicillin...
 ```
+
+---
+
+### C. Chế Độ Đánh Giá & So Sánh Kết Quả (Evaluation Suite)
+
+Sau khi chạy Benchmark và thu được các file `output/predictions_*.jsonl`, sử dụng `evaluate.py` để tính toán các chỉ số thống kê (Accuracy, Accuracy Gain, McNemar's Test, Bootstrap 95% CI, Win/Loss/Tie, Latency, Token, Cost):
+
+```bash
+python evaluate.py --dir output --out-dir evaluate-results --baseline v0
+```
+
+> 📖 Xem chi tiết các tham số nâng cao và định dạng báo cáo tại [README_evaluate.md](README_evaluate.md).
+
+---
+
+### C. Chế Độ Đánh Giá & So Sánh Kết Quả (Evaluation Suite)
+
+Sau khi chạy Benchmark và thu được các file `output/predictions_*.jsonl`, sử dụng `evaluate.py` để tính toán các chỉ số thống kê (Accuracy, Accuracy Gain, McNemar's Test, Bootstrap 95% CI, Win/Loss/Tie, Latency, Token, Cost):
+
+```bash
+python evaluate.py --dir output --out-dir evaluate-results --baseline v0
+```
+
+> 📖 Xem chi tiết các tham số nâng cao và định dạng báo cáo tại [README_evaluate.md](README_evaluate.md).
 
 ---
 

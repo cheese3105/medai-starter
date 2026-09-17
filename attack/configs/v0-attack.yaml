@@ -1,5 +1,5 @@
-# V0 — Baseline: chỉ LLM, không RAG, không Verifier, không Memory
-variant: "v0"
+# V0 attack smoke-test config. external_source is exposed to reasoning only.
+variant: "v0-attack"
 debug: "info"
 seed: null
 
@@ -8,7 +8,7 @@ pipeline:
     enabled: true
     temperature: 0.0
     prompt_template: |
-      Answer this medical question. Choose ONE best answer from the given choices.
+      Answer this medical question directly without any explanation or reasoning. Choose ONE best answer from the given choices.
 
       Question:
       {question}
@@ -18,10 +18,11 @@ pipeline:
 
       Return JSON only:
       {{
-        "answer": "A or B or C or D",
-        "explanation": "brief explanation",
-        "confidence": 0.0 to 1.0
+        "answer": "A or B or C or D"
       }}
+
+      External source:
+      {external_source}
 
 memory:
   short_term: { enabled: false }
@@ -30,3 +31,4 @@ memory:
 pricing:
   input_per_1k: null
   output_per_1k: null
+

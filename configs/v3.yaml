@@ -1,7 +1,7 @@
 # V3 — V2 + Memory: STM loop-scratchpad giúp tránh lặp vòng vô ích,
 # LTM read_only chứa reflection từ train split
 variant: "v3"
-debug: "off"
+debug: "info"
 seed: null
 
 pipeline:
