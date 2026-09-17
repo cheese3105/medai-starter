@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any, Optional
 
 from langchain_openai import ChatOpenAI
@@ -46,6 +47,7 @@ def build_llm(
     enable_reasoning: bool = True,
     reasoning_effort: Optional[str] = None,
     max_tokens: Optional[int] = 2048,
+    provider: Optional[str] = None,
 ) -> ChatOpenAI:
     kwargs = {"seed": seed} if seed is not None else {}
     if max_tokens is not None:
@@ -57,6 +59,15 @@ def build_llm(
         extra_body["reasoning"] = {"effort": "none"}
     elif reasoning_effort is not None:
         extra_body["reasoning"] = {"effort": reasoning_effort}
+
+    # Pin OpenRouter requests when a provider is configured. `only` restricts
+    # routing to that provider and disabling fallbacks prevents silent rerouting.
+    selected_provider = provider or os.getenv("OPENROUTER_PROVIDER", "").strip()
+    if selected_provider and "openrouter.ai" in base_url.lower():
+        extra_body["provider"] = {
+            "only": [selected_provider],
+            "allow_fallbacks": False,
+        }
 
     return ChatOpenAI(
         model=model, base_url=base_url, api_key=api_key,

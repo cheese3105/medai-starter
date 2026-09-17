@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from core.config import RunConfig, StageConfig
 from core.logger import DebugLogger
-from core.llm_client import extract_token_usage
+from core.llm_client import build_llm, extract_token_usage
 from core.runner import Runner, _STAGE_CLASSES
 from core.types import EpisodeInput, StageOutput
 
@@ -76,6 +77,42 @@ class CoreIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(extract_token_usage(legacy_response), {"input": 7, "output": 2})
         self.assertEqual(extract_token_usage(SimpleNamespace()), {})
+
+    @patch("core.llm_client.ChatOpenAI")
+    @patch.dict("os.environ", {"OPENROUTER_PROVIDER": "deepinfra"})
+    def test_openrouter_provider_is_pinned_without_fallbacks(self, chat_openai) -> None:
+        build_llm(
+            model="test-model",
+            base_url="https://openrouter.ai/api/v1",
+            api_key="test-key",
+            enable_reasoning=False,
+        )
+
+        self.assertEqual(
+            chat_openai.call_args.kwargs["extra_body"],
+            {
+                "reasoning": {"effort": "none"},
+                "provider": {
+                    "only": ["deepinfra"],
+                    "allow_fallbacks": False,
+                },
+            },
+        )
+
+    @patch("core.llm_client.ChatOpenAI")
+    @patch.dict("os.environ", {"OPENROUTER_PROVIDER": "deepinfra"})
+    def test_provider_setting_is_not_sent_to_other_endpoints(self, chat_openai) -> None:
+        build_llm(
+            model="test-model",
+            base_url="http://localhost:11434/v1",
+            api_key="test-key",
+            enable_reasoning=False,
+        )
+
+        self.assertEqual(
+            chat_openai.call_args.kwargs["extra_body"],
+            {"reasoning": {"effort": "none"}},
+        )
 
 
 if __name__ == "__main__":
