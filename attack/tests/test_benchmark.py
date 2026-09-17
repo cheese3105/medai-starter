@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,7 +9,7 @@ from unittest.mock import patch
 
 from attack.benchmark import invoke_injected_task, run_attack_benchmark
 from attack.tasks import InjectedExample, InjectedTask
-from core.config import RunConfig, StageConfig
+from core.config import RunConfig, StageConfig, load_config
 from core.types import EpisodeInput, EpisodeResult
 
 
@@ -43,6 +44,34 @@ def _fake_injected(config, task, example):
 
 
 class BenchmarkOrchestrationTests(unittest.TestCase):
+    def test_qr_attack_configs_expose_external_source_only_to_reasoning(self) -> None:
+        project_root = Path(__file__).resolve().parents[2]
+        expected = {
+            "v2-qr-attack.yaml": ("v2-qr-attack", False),
+            "v3-qr-attack.yaml": ("v3-qr-attack", True),
+        }
+
+        for filename, (variant, memory_enabled) in expected.items():
+            with self.subTest(config=filename), patch.dict(
+                os.environ, {"REASONING_MODEL": "fake-model"}
+            ):
+                config = load_config(str(project_root / "attack" / "configs" / filename))
+
+            self.assertEqual(config.variant, variant)
+            self.assertEqual(
+                [stage.name for stage in config.pipeline],
+                ["query_rewriter", "retrieval", "reasoning", "verifier"],
+            )
+            self.assertGreaterEqual(config.max_iterations, 1)
+            reasoning = config.get_stage("reasoning")
+            self.assertIsNotNone(reasoning)
+            self.assertIn("{external_source}", reasoning.prompt_template)
+            self.assertFalse(reasoning.extra["reasoning"])
+            for stage in config.pipeline:
+                if stage.name != "reasoning":
+                    self.assertNotIn("{external_source}", stage.prompt_template)
+            self.assertEqual(config.memory.long_term.enabled, memory_enabled)
+
     @patch("attack.benchmark.build_llm")
     def test_clean_injected_call_uses_reasoning_stage_setting(self, build_llm) -> None:
         build_llm.return_value.invoke.return_value.content = '{"label":"positive"}'
@@ -80,6 +109,7 @@ class BenchmarkOrchestrationTests(unittest.TestCase):
     ) -> None:
         load_config.return_value = RunConfig(
             variant="fake-v0",
+            debug="verbose",
             model="fake-model",
             pipeline=[StageConfig(name="reasoning", prompt_template="{question}")],
         )
@@ -121,6 +151,10 @@ class BenchmarkOrchestrationTests(unittest.TestCase):
             self.assertTrue((output / "clean_injected.jsonl").is_file())
             self.assertTrue((output / "metrics.json").is_file())
             self.assertTrue((output / "run_config.json").is_file())
+            self.assertTrue((output / "trace.jsonl").is_file())
+            self.assertEqual(result["trace_file"], str(output / "trace.jsonl"))
+            run_config = json.loads((output / "run_config.json").read_text(encoding="utf-8"))
+            self.assertEqual(run_config["trace_file"], str(output / "trace.jsonl"))
             cases = (output / "cases.jsonl").read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(cases), 4)
             clean_injected = (output / "clean_injected.jsonl").read_text(

@@ -80,7 +80,6 @@
 - [ ] Track actual retrieval-query history and prevent duplicate-query retries.
 - [ ] Remove dead/mislabeled `loop_history` prompt content, especially in v2-qr.
 - [ ] Replace full failed evidence in retry prompts with a compact verifier retrieval gap.
-- [x] Remove verifier `confidence` and `final_answer`; retain the reasoning draft values.
 - [ ] Implement real LTM retrieval for v3-qr benchmarks or disable the unused LTM prompt sections.
 - [ ] Remove unused runner fields and save useful query/evidence history for evaluation.
 - [ ] Benchmark after each change to measure accuracy, latency, and token impact.

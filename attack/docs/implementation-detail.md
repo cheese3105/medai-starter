@@ -120,7 +120,7 @@ attack/
 ├── benchmark.py            # Execution and incremental writes
 ├── metrics.py              # Aggregate calculations
 ├── cli.py                  # Command-line interface
-├── configs/v0-attack.yaml  # V0 reasoning prompt with external_source
+├── configs/                # V0/V1-QR/V2-QR/V3-QR attack configurations
 ├── docs/
 └── tests/
 

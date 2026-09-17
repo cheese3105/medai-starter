@@ -88,14 +88,23 @@ def run_attack_benchmark(
         raise ValueError("Target config must enable the reasoning stage")
     reasoning.extra["reasoning"] = False
     ensure_external_source_prompt(config)
-    logger = DebugLogger(level=config.debug)
+
+    destination = Path(output_dir)
+    destination.mkdir(parents=True, exist_ok=True)
+    trace_path = destination / "trace.jsonl" if config.is_verbose else None
+    if trace_path is not None:
+        trace_path.write_text("", encoding="utf-8")
+    logger = DebugLogger(
+        level=config.debug,
+        trace_path=str(trace_path) if trace_path is not None else None,
+    )
+    if trace_path is not None:
+        logger.info(f"Verbose trace: {trace_path}")
     runner = Runner(config, logger)
     targets = load_targets(split, target_limit)
     tasks = load_tasks(task_names, injected_limit, seed)
     selected_attacks: dict[str, AttackBuilder] = {name: ATTACKS[name] for name in attack_names}
 
-    destination = Path(output_dir)
-    destination.mkdir(parents=True, exist_ok=True)
     clean_targets_path = destination / "clean_targets.jsonl"
     clean_injected_path = destination / "clean_injected.jsonl"
     cases_path = destination / "cases.jsonl"
@@ -109,6 +118,7 @@ def run_attack_benchmark(
         "target_dataset": "GBaker/MedQA-USMLE-4-options", "split": split,
         "target_limit": target_limit, "injected_limit": injected_limit,
         "sample_size_per_task": sample_size, "seed": seed, "attacks": attack_names,
+        "trace_file": str(trace_path) if trace_path is not None else None,
         "tasks": [{"name": task.name, "dataset": task.dataset_name, "split": task.split,
                    "selected_count": len(task.examples)} for task in tasks],
     }
@@ -214,5 +224,6 @@ def run_attack_benchmark(
 
     metrics = calculate_metrics(clean_target_rows, clean_injected_rows, case_rows)
     _write_json(destination / "metrics.json", metrics)
-    return {"output_dir": str(destination), "case_count": len(case_rows),
+    return {"output_dir": str(destination), "trace_file": run_metadata["trace_file"],
+            "case_count": len(case_rows),
             "metrics": metrics, "run_config": run_metadata}

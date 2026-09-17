@@ -1,6 +1,6 @@
 # V0 attack smoke-test config. external_source is exposed to reasoning only.
 variant: "v0-attack"
-debug: "info"
+debug: "verbose"
 seed: null
 
 pipeline:

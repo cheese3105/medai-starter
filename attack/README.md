@@ -3,7 +3,7 @@
 This directory contains the small attack-only benchmark described in
 [`docs/implementation-detail.md`](docs/implementation-detail.md).
 
-The initial version provides:
+The benchmark provides:
 
 - all five paper attacks: Naive, Escape Characters, Context Ignoring, Fake
   Completion, and Combined;
@@ -12,7 +12,8 @@ The initial version provides:
 - deterministic pair sampling;
 - PNA-T, PNA-I, Attack Success Value, Matching Rate, end-to-end latency, and
   chat-model token usage;
-- selectable MED-AI YAML configuration with reasoning-only `external_source`.
+- attack configurations for V0, V1-QR, V2-QR, and V3-QR, with a
+  reasoning-only `external_source`.
 
 Run the V0 smoke benchmark:
 
