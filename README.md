@@ -159,17 +159,17 @@ python main.py --mode benchmark --config <duong_dan_file_config> [cac_tham_so_b�
    python main.py --mode benchmark --config configs/v0.yaml --split test --limit 200 --workers 8
    ```
 
-2. **Chạy V1 (RAG Evidence Retrieval)**:
+3. **Chạy V1-QR (Query Rewriter + RAG Evidence Retrieval)**:
    ```bash
-   python main.py --mode benchmark --config configs/v1.yaml --split test --limit 200 --workers 8
+   python main.py --mode benchmark --config configs/v1-qr.yaml --split test --limit 200 --workers 8
    ```
 
-3. **Chạy V2-QR (Verification + Query Rewriter)**:
+4. **Chạy V2-QR (Verification + Query Rewriter)**:
    ```bash
    python main.py --mode benchmark --config configs/v2-qr.yaml --split test --limit 200 --workers 8
    ```
 
-4. **Chạy V3-QR (Toàn bộ Pipeline + RAG + Verifier + Query Rewriter + LTM Read-Only)**:
+5. **Chạy V3-QR (Toàn bộ Pipeline + RAG + Verifier + Query Rewriter + LTM Read-Only)**:
    ```bash
    python main.py --mode benchmark --config configs/v3-qr.yaml --split test --limit 200 --workers 8
    ```
