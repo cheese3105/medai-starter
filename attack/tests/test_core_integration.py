@@ -30,6 +30,20 @@ class _FakeReasoningStage:
         )
 
 
+class _FakeVerifierStage:
+    def __init__(self, run_config, stage_config):
+        pass
+
+    def run(self, context):
+        return StageOutput(
+            stage_name="verifier",
+            data={
+                "verdict": "supported",
+                "explanation": "verified",
+            },
+        )
+
+
 class CoreIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.original = dict(_STAGE_CLASSES)
@@ -63,6 +77,28 @@ class CoreIntegrationTests(unittest.TestCase):
     def test_external_source_defaults_to_empty(self) -> None:
         episode = EpisodeInput(question_id="q1", question="question")
         self.assertEqual(episode.external_source, "")
+
+    def test_verifier_keeps_reasoning_answer_and_confidence(self) -> None:
+        _STAGE_CLASSES["verifier"] = _FakeVerifierStage
+        config = RunConfig(
+            variant="test",
+            model="fake",
+            pipeline=[
+                StageConfig(name="reasoning", prompt_template="{question}"),
+                StageConfig(name="verifier", prompt_template="{draft_answer}"),
+            ],
+        )
+
+        result = Runner(config, DebugLogger()).run_episode(EpisodeInput(
+            question_id="q1",
+            question="question",
+            choices=["one", "two", "three", "four"],
+            gold_answer="A",
+        ))
+
+        self.assertEqual(result.predicted_answer, "A")
+        self.assertEqual(result.confidence, 1.0)
+        self.assertEqual(result.explanation, "verified")
 
     def test_normalizes_usage_metadata_and_reports_missing_usage(self) -> None:
         response = SimpleNamespace(

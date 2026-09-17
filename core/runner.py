@@ -170,8 +170,7 @@ class Runner:
 
             # BƯỚC 4: Verifier (luôn nhận question gốc)
             if self.has_verifier:
-                context.update(draft_answer=draft_answer, draft_explanation=draft_explanation,
-                               draft_confidence=draft_confidence)
+                context.update(draft_answer=draft_answer, draft_explanation=draft_explanation)
                 self.logger.stage_start(qid, iteration, "verifier")
                 out = self.stages["verifier"].run(context)
                 verdict = out.data.get("verdict", "supported")
@@ -187,9 +186,9 @@ class Runner:
                                       context["question"], context["choices"],
                                       out.data.get("prompt", ""), out.data.get("raw_response", ""),
                                       out.data, out.latency_ms, out.token_usage)
-                final_answer = out.data.get("final_answer", draft_answer)
+                final_answer = draft_answer
                 final_explanation = out.data.get("explanation", draft_explanation)
-                final_confidence = out.data.get("confidence", draft_confidence)
+                final_confidence = draft_confidence
 
                 if verdict == "supported":
                     break

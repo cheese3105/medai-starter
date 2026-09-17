@@ -12,8 +12,6 @@ from core.llm_client import build_llm, extract_token_usage
 from core.types import StageOutput
 from stages.base import BaseStage
 
-LABELS = ["A", "B", "C", "D"]
-
 
 def _extract_json(text: str) -> dict:
     text = re.sub(r"^```(?:json)?\s*", "", text.strip())
@@ -54,28 +52,16 @@ class VerifierStage(BaseStage):
         except (ValueError, json.JSONDecodeError):
             parsed = {
                 "verdict": "supported",
-                "final_answer": context.get("draft_answer", "INVALID"),
-                "confidence": context.get("draft_confidence", 0.0),
             }
 
         verdict = parsed.get("verdict", "supported").lower().strip()
         if verdict not in ("supported", "unsupported"):
             verdict = "supported"
 
-        final_answer = parsed.get("final_answer", context.get("draft_answer", ""))
-        confidence = float(parsed.get("confidence", context.get("draft_confidence", 0.0)))
-
-        if verdict == "unsupported":
-            confidence = min(confidence, 0.3)
-        if context.get("choices") and final_answer not in LABELS:
-            final_answer = context.get("draft_answer", "INVALID")
-
         return StageOutput(
             stage_name="verifier",
             data={
                 "verdict": verdict,
-                "final_answer": final_answer,
-                "confidence": confidence,
                 "explanation": parsed.get("explanation", ""),
                 "suggested_query": parsed.get("suggested_query", ""),
                 "raw_response": raw_text,
