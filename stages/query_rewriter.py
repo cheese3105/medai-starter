@@ -12,7 +12,7 @@ import time
 from typing import Any
 
 from core.config import RunConfig, StageConfig
-from core.llm_client import build_llm
+from core.llm_client import build_llm, extract_token_usage
 from core.types import StageOutput
 from stages.base import BaseStage
 
@@ -48,11 +48,7 @@ class QueryRewriterStage(BaseStage):
         response = self.llm.invoke(prompt)
         latency_ms = (time.time() - start) * 1000
 
-        token_usage = {"input": 0, "output": 0}
-        if hasattr(response, "response_metadata"):
-            usage = response.response_metadata.get("token_usage", {})
-            token_usage["input"] = usage.get("prompt_tokens", 0)
-            token_usage["output"] = usage.get("completion_tokens", 0)
+        token_usage = extract_token_usage(response)
 
         raw_text = response.content
         try:

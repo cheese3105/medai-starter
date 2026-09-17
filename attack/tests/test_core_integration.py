@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
 
 from core.config import RunConfig, StageConfig
 from core.logger import DebugLogger
+from core.llm_client import extract_token_usage
 from core.runner import Runner, _STAGE_CLASSES
 from core.types import EpisodeInput, StageOutput
 
@@ -55,12 +57,26 @@ class CoreIntegrationTests(unittest.TestCase):
         self.assertEqual(_FakeReasoningStage.last_context["external_source"], "external payload")
         self.assertEqual(result.reasoning_raw_response, '{"answer":"A"}')
         self.assertTrue(result.is_correct)
+        self.assertEqual(result.total_token_usage, {})
 
     def test_external_source_defaults_to_empty(self) -> None:
         episode = EpisodeInput(question_id="q1", question="question")
         self.assertEqual(episode.external_source, "")
 
+    def test_normalizes_usage_metadata_and_reports_missing_usage(self) -> None:
+        response = SimpleNamespace(
+            usage_metadata={"input_tokens": 12, "output_tokens": 3}
+        )
+        self.assertEqual(extract_token_usage(response), {"input": 12, "output": 3})
+        legacy_response = SimpleNamespace(
+            usage_metadata=None,
+            response_metadata={
+                "token_usage": {"prompt_tokens": 7, "completion_tokens": 2}
+            },
+        )
+        self.assertEqual(extract_token_usage(legacy_response), {"input": 7, "output": 2})
+        self.assertEqual(extract_token_usage(SimpleNamespace()), {})
+
 
 if __name__ == "__main__":
     unittest.main()
-

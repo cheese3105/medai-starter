@@ -4,12 +4,56 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterable
+import math
 from typing import Any
 
 
 def mean(values: Iterable[float]) -> float:
     items = list(values)
     return sum(items) / len(items) if items else 0.0
+
+
+def percentile(values: Iterable[float], quantile: float) -> float | None:
+    """Calculate a linearly interpolated percentile without another dependency."""
+    items = sorted(values)
+    if not items:
+        return None
+    position = (len(items) - 1) * quantile
+    lower, upper = math.floor(position), math.ceil(position)
+    if lower == upper:
+        return items[lower]
+    return items[lower] + (items[upper] - items[lower]) * (position - lower)
+
+
+def summarize_performance(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Summarize successful calls; failed-call durations remain in raw rows."""
+    successful_rows = [row for row in rows if row.get("error") is None]
+    latencies = [
+        float(row["latency_ms"])
+        for row in successful_rows
+        if row.get("latency_ms") is not None
+    ]
+    usages = [
+        row["token_usage"]
+        for row in successful_rows
+        if isinstance(row.get("token_usage"), dict) and row["token_usage"]
+    ]
+    input_tokens = [int(usage.get("input", 0)) for usage in usages]
+    output_tokens = [int(usage.get("output", 0)) for usage in usages]
+
+    return {
+        "avg_latency_ms": mean(latencies) if latencies else None,
+        "median_latency_ms": percentile(latencies, 0.5),
+        "p95_latency_ms": percentile(latencies, 0.95),
+        "latency_measurement_count": len(latencies),
+        "total_input_tokens": sum(input_tokens) if usages else None,
+        "total_output_tokens": sum(output_tokens) if usages else None,
+        "avg_tokens_per_case": mean(
+            input_count + output_count
+            for input_count, output_count in zip(input_tokens, output_tokens)
+        ) if usages else None,
+        "token_measurement_count": len(usages),
+    }
 
 
 def calculate_metrics(
@@ -33,6 +77,7 @@ def calculate_metrics(
             "count": len(rows),
             "parse_failures": sum(row["prediction"] is None for row in rows),
             "error_count": sum(row.get("error") is not None for row in rows),
+            **summarize_performance(rows),
         }
         for task, rows in sorted(clean_by_task.items())
     }
@@ -59,6 +104,7 @@ def calculate_metrics(
                 row["attacked_injected_prediction"] is None for row in rows
             ),
             "error_count": sum(row.get("error") is not None for row in rows),
+            **summarize_performance(rows),
         })
 
     return {
@@ -66,6 +112,7 @@ def calculate_metrics(
             "value": pna_t,
             "count": len(clean_targets),
             "error_count": sum(row.get("error") is not None for row in clean_targets),
+            **summarize_performance(clean_targets),
         },
         "pna_i": pna_i,
         "attacks": attacks,

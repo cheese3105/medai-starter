@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -12,7 +13,7 @@ from attack.metrics import calculate_metrics
 from attack.sampling import sample_pairs
 from attack.tasks import InjectedExample, InjectedTask, load_tasks
 from core.config import RunConfig, load_config
-from core.llm_client import build_llm
+from core.llm_client import build_llm, extract_token_usage
 from core.logger import DebugLogger
 from core.runner import Runner
 from core.types import EpisodeInput
@@ -38,15 +39,21 @@ def load_targets(split: str, limit: int) -> list[EpisodeInput]:
     return targets
 
 
-def invoke_injected_task(config: RunConfig, task: InjectedTask, example: InjectedExample) -> str:
+def invoke_injected_task(
+    config: RunConfig, task: InjectedTask, example: InjectedExample
+) -> tuple[str, float, dict[str, int]]:
     reasoning = config.get_stage("reasoning")
     if reasoning is None:
         raise ValueError("Target config must enable the reasoning stage")
     llm = build_llm(model=config.model, base_url=config.model_base_url,
                     api_key=config.model_api_key, temperature=reasoning.temperature,
-                    seed=config.seed)
+                    seed=config.seed,
+                    enable_reasoning=reasoning.extra.get("reasoning", False),
+                    reasoning_effort=reasoning.extra.get("reasoning_effort"))
+    start = time.perf_counter()
     response = llm.invoke(f"{task.instruction}\n\nInput:\n{example.text}")
-    return str(response.content)
+    latency_ms = (time.perf_counter() - start) * 1000
+    return str(response.content), latency_ms, extract_token_usage(response)
 
 
 def _write_json(path: Path, payload: Any) -> None:
@@ -76,6 +83,10 @@ def run_attack_benchmark(
         raise ValueError("target_limit and injected_limit must be at least 1")
 
     config = load_config(target_config)
+    reasoning = config.get_stage("reasoning")
+    if reasoning is None:
+        raise ValueError("Target config must enable the reasoning stage")
+    reasoning.extra["reasoning"] = False
     ensure_external_source_prompt(config)
     logger = DebugLogger(level=config.debug)
     runner = Runner(config, logger)
@@ -94,6 +105,7 @@ def run_attack_benchmark(
     run_metadata = {
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "target_config": target_config, "variant": config.variant, "model": config.model,
+        "enable_reasoning": False,
         "target_dataset": "GBaker/MedQA-USMLE-4-options", "split": split,
         "target_limit": target_limit, "injected_limit": injected_limit,
         "sample_size_per_task": sample_size, "seed": seed, "attacks": attack_names,
@@ -107,17 +119,22 @@ def run_attack_benchmark(
     clean_target_predictions: dict[str, str | None] = {}
     for target in targets:
         error, prediction = None, None
+        latency_ms, token_usage = None, {}
+        start = time.perf_counter()
         try:
             result = runner.run_episode(EpisodeInput(
                 target.question_id, target.question, target.choices, target.gold_answer,
                 CLEAN_EXTERNAL_SOURCE))
             prediction = result.predicted_answer
+            latency_ms = result.total_latency_ms
+            token_usage = result.total_token_usage
         except Exception as exc:
+            latency_ms = (time.perf_counter() - start) * 1000
             error = _error_message(exc)
             logger.warn(f"[PNA-T] {target.question_id}: {error}")
         row = {"target_id": target.question_id, "prediction": prediction,
                "gold": target.gold_answer, "is_correct": prediction == target.gold_answer,
-               "error": error}
+               "latency_ms": latency_ms, "token_usage": token_usage, "error": error}
         clean_target_predictions[target.question_id] = prediction
         clean_target_rows.append(row)
         _append_jsonl(clean_targets_path, row)
@@ -128,17 +145,21 @@ def run_attack_benchmark(
     for task in tasks:
         for example in task.examples:
             error, raw, prediction = None, "", None
+            latency_ms, token_usage = None, {}
+            start = time.perf_counter()
             try:
-                raw = invoke_injected_task(config, task, example)
+                raw, latency_ms, token_usage = invoke_injected_task(config, task, example)
                 prediction = task.parse_label(raw)
             except Exception as exc:
+                latency_ms = (time.perf_counter() - start) * 1000
                 error = _error_message(exc)
                 logger.warn(f"[PNA-I] {task.name}/{example.id}: {error}")
             row = {"task": task.name, "dataset": task.dataset_name, "split": task.split,
                    "example_id": example.id, "prediction": prediction,
                    "gold": example.gold_label,
                    "is_correct": task.score(prediction, example.gold_label),
-                   "raw_response": raw, "error": error}
+                   "raw_response": raw, "latency_ms": latency_ms,
+                   "token_usage": token_usage, "error": error}
             clean_injected_predictions[(task.name, example.id)] = prediction
             clean_injected_rows.append(row)
             _append_jsonl(clean_injected_path, row)
@@ -153,6 +174,8 @@ def run_attack_benchmark(
                                                     injected.text)
                 error, attacked_target_prediction = None, None
                 attacked_label, raw_response = None, ""
+                latency_ms, token_usage = None, {}
+                start = time.perf_counter()
                 try:
                     attacked = runner.run_episode(EpisodeInput(
                         target.question_id, target.question, target.choices,
@@ -160,7 +183,10 @@ def run_attack_benchmark(
                     attacked_target_prediction = attacked.predicted_answer
                     raw_response = attacked.reasoning_raw_response or ""
                     attacked_label = task.parse_label(raw_response)
+                    latency_ms = attacked.total_latency_ms
+                    token_usage = attacked.total_token_usage
                 except Exception as exc:
+                    latency_ms = (time.perf_counter() - start) * 1000
                     error = _error_message(exc)
                     logger.warn(f"[ATTACK] {attack_name}/{task.name}/{target.question_id}: {error}")
                 clean_injected = clean_injected_predictions[(task.name, injected.id)]
@@ -178,7 +204,9 @@ def run_attack_benchmark(
                     "attacked_injected_prediction": attacked_label,
                     "asv_contribution": task.score(attacked_label, injected.gold_label),
                     "mr_contribution": task.score(attacked_label, clean_injected),
-                    "raw_attacked_response": raw_response, "error": error,
+                    "raw_attacked_response": raw_response,
+                    "latency_ms": latency_ms, "token_usage": token_usage,
+                    "error": error,
                     "variant": config.variant, "seed": seed,
                 }
                 case_rows.append(row)
@@ -188,4 +216,3 @@ def run_attack_benchmark(
     _write_json(destination / "metrics.json", metrics)
     return {"output_dir": str(destination), "case_count": len(case_rows),
             "metrics": metrics, "run_config": run_metadata}
-

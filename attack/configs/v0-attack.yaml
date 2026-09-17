@@ -6,6 +6,7 @@ seed: null
 pipeline:
   - name: reasoning
     enabled: true
+    reasoning: false
     temperature: 0.0
     prompt_template: |
       Answer this medical question directly without any explanation or reasoning. Choose ONE best answer from the given choices.
@@ -31,4 +32,3 @@ memory:
 pricing:
   input_per_1k: null
   output_per_1k: null
-

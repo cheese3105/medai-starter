@@ -74,7 +74,7 @@ class Runner:
                     stm_session_history: Optional[str] = None,
                     ltm_facts: Optional[str] = None) -> EpisodeResult:
         qid = episode_input.question_id
-        ep_start = time.time()
+        ep_start = time.perf_counter()
 
         base_context: dict[str, Any] = {
             "question":          episode_input.question,           # KHÔNG BAO GIỜ thay đổi
@@ -88,6 +88,7 @@ class Runner:
         }
 
         total_tokens = {"input": 0, "output": 0}
+        token_usage_available = False
         ret_latency, ret_tokens = 0.0, {"input": 0, "output": 0}
         rsn_latency, rsn_tokens = 0.0, {"input": 0, "output": 0}
         ver_latency, ver_tokens = 0.0, {"input": 0, "output": 0}
@@ -111,6 +112,7 @@ class Runner:
                 rw_out = self.stages["query_rewriter"].run(context)
                 retrieval_query = rw_out.data.get("rewritten_query", context["question"])
                 rw_latency += rw_out.latency_ms
+                token_usage_available = token_usage_available or bool(rw_out.token_usage)
                 for k in ("input", "output"):
                     rw_tokens[k] += rw_out.token_usage.get(k, 0)
                     total_tokens[k] += rw_out.token_usage.get(k, 0)
@@ -155,6 +157,7 @@ class Runner:
             draft_confidence = out.data.get("confidence", 0.0)
             reasoning_raw_response = out.data.get("raw_response", "")
             rsn_latency += out.latency_ms
+            token_usage_available = token_usage_available or bool(out.token_usage)
             for k in ("input", "output"):
                 rsn_tokens[k] += out.token_usage.get(k, 0)
                 total_tokens[k] += out.token_usage.get(k, 0)
@@ -174,6 +177,7 @@ class Runner:
                 verdict = out.data.get("verdict", "supported")
                 verdict_history.append(verdict)
                 ver_latency += out.latency_ms
+                token_usage_available = token_usage_available or bool(out.token_usage)
                 for k in ("input", "output"):
                     ver_tokens[k] += out.token_usage.get(k, 0)
                     total_tokens[k] += out.token_usage.get(k, 0)
@@ -207,7 +211,7 @@ class Runner:
         else:
             stopped_early = True
 
-        total_latency = (time.time() - ep_start) * 1000
+        total_latency = (time.perf_counter() - ep_start) * 1000
         is_correct = (final_answer == episode_input.gold_answer) if episode_input.gold_answer is not None else None
         self.logger.episode_done(qid, final_answer, len(verdict_history) or 1,
                                  _estimate_cost(total_tokens, self.config.pricing.input_per_1k, self.config.pricing.output_per_1k))
@@ -217,7 +221,7 @@ class Runner:
             predicted_answer=final_answer, explanation=final_explanation,
             confidence=final_confidence, gold_answer=episode_input.gold_answer,
             is_correct=is_correct, total_latency_ms=total_latency,
-            total_token_usage=total_tokens,
+            total_token_usage=total_tokens if token_usage_available else {},
             estimated_cost=_estimate_cost(total_tokens, self.config.pricing.input_per_1k, self.config.pricing.output_per_1k),
             evidence_used=evidence_ids if self.has_retrieval else None,
             retrieval_latency_ms=ret_latency if self.has_retrieval else None,

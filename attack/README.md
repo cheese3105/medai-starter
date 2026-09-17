@@ -10,7 +10,8 @@ The initial version provides:
 - five remote/cached classification tasks: SST-2 sentiment, UCI SMS Spam, MRPC
   duplicate detection, HSOL hate detection, and RTE natural-language inference;
 - deterministic pair sampling;
-- PNA-T, PNA-I, Attack Success Value, and Matching Rate;
+- PNA-T, PNA-I, Attack Success Value, Matching Rate, end-to-end latency, and
+  chat-model token usage;
 - selectable MED-AI YAML configuration with reasoning-only `external_source`.
 
 Run the V0 smoke benchmark:
@@ -40,6 +41,10 @@ The run writes `clean_targets.jsonl`, `clean_injected.jsonl`, and `cases.jsonl`
 incrementally. It writes `metrics.json` after completion and records dataset and
 run settings in `run_config.json`. Individual model-call failures are recorded
 and counted instead of terminating the whole benchmark.
+
+Each result row records end-to-end `latency_ms` and provider-reported
+`token_usage`. `metrics.json` summarizes successful calls with average, median,
+and p95 latency plus token totals and averages.
 
 Run unit tests without an LLM endpoint:
 
