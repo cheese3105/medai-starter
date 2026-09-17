@@ -101,26 +101,28 @@ Framework được thiết kế với 4 phiên bản kiến trúc chính:
    ```
    Chỉnh sửa các giá trị trong `.env` phù hợp với mô hình của bạn:
    ```env
-   # --- Reasoning Model (Bắt buộc) ---
-   REASONING_MODEL=your-model-name
-   REASONING_MODEL_BASE_URL=http://localhost:11434/v1
-   REASONING_MODEL_API_KEY=dummy
+    # --- Reasoning Model (Bắt buộc) ---
+    # Hỗ trợ tốt các mô hình Reasoning / CoT như DeepSeek Flash, DeepSeek R1, GPT-4o
+    REASONING_MODEL=deepseek/deepseek-v4-flash
+    REASONING_MODEL_BASE_URL=https://openrouter.ai/api/v1
+    REASONING_MODEL_API_KEY=your-openrouter-api-key
 
-   # --- Verifier Model (Tùy chọn, mặc định dùng chung với Reasoning Model) ---
-   # VERIFIER_MODEL=your-verifier-model
-   # VERIFIER_MODEL_BASE_URL=http://localhost:11434/v1
-   # VERIFIER_MODEL_API_KEY=dummy
+    # --- Verifier Model (Tùy chọn, mặc định fallback về REASONING_MODEL) ---
+    # Có thể tách riêng model nhẹ không reasoning (deepseek-chat) để tiết kiệm token và tăng tốc
+    # VERIFIER_MODEL=deepseek/deepseek-chat
+    # VERIFIER_MODEL_BASE_URL=https://openrouter.ai/api/v1
+    # VERIFIER_MODEL_API_KEY=your-api-key
 
-   # --- Embedding Model (Cần thiết cho V1+ RAG và V3 LTM) ---
-   # EMBEDDING_MODEL=bge-m3
-   # EMBEDDING_MODEL_BASE_URL=https://openrouter.ai/api/v1   # Hoặc EMBEDDING_MODEL_API_BASE
-   # EMBEDDING_MODEL_API_KEY=your-key
+    # --- Embedding Model (Bắt buộc cho V1+ RAG và V3 LTM) ---
+    EMBEDDING_MODEL=baai/bge-m3
+    EMBEDDING_MODEL_BASE_URL=https://openrouter.ai/api/v1
+    EMBEDDING_MODEL_API_KEY=your-openrouter-api-key
 
-   # --- Query Rewriter Model (Tùy chọn) ---
-   # QUERY_REWRITER_MODEL=your-model
-   # QUERY_REWRITER_MODEL_BASE_URL=http://localhost:11434/v1
-   # QUERY_REWRITER_MODEL_API_KEY=dummy
-   ```
+    # --- Query Rewriter Model (Tùy chọn, mặc định fallback về REASONING_MODEL) ---
+    # QUERY_REWRITER_MODEL=deepseek/deepseek-chat
+    # QUERY_REWRITER_MODEL_BASE_URL=https://openrouter.ai/api/v1
+    # QUERY_REWRITER_MODEL_API_KEY=your-api-key
+    ```
 4. **Tải dữ liệu ChromaDB cho RAG**:
 Cơ sở dữ liệu ChromaDB đã được ingest sẵn: https://drive.google.com/file/d/1pIQYQ7CHJPbWqNW07kff5XA3YS8ER_Bb/view?usp=sharing
 
@@ -137,6 +139,8 @@ Copy thư mục `data/chroma/...` vào thư mục gốc của project: `data/chr
 
 Chế độ này tải bộ dữ liệu `GBaker/MedQA-USMLE-4-options` từ HuggingFace Datasets, đưa từng câu hỏi qua Pipeline và tính toán độ chính xác (Accuracy), latency, token usage.
 
+Hệ thống hỗ trợ **Multi-threading (chạy song song đa luồng)**, giúp giảm thời gian chạy từ hàng tiếng đồng hồ xuống còn **vài phút** (nhanh gấp ~15 - 20 lần).
+
 **Cú pháp chung**:
 ```bash
 python main.py --mode benchmark --config <duong_dan_file_config> [cac_tham_so_bổ_sung]
@@ -144,35 +148,38 @@ python main.py --mode benchmark --config <duong_dan_file_config> [cac_tham_so_b�
 
 **Các tham số CLI tùy chọn**:
 - `--split`: Tập dữ liệu (`test` hoặc `train`, mặc định: `test`).
-- `--limit`: Giới hạn số lượng câu hỏi cần chạy (ví dụ `--limit 20` để test nhanh).
+- `--limit`: Giới hạn số lượng câu hỏi cần chạy (ví dụ `--limit 200`).
+- `--workers`: Số luồng chạy song song (mặc định: `8`). Đề xuất: `8` để đạt tốc độ tối đa không bị nghẽn API.
 - `--output`: Đường dẫn tùy chỉnh tệp lưu kết quả `.jsonl` (mặc định lưu tự động vào `output/predictions_<variant>_<timestamp>.jsonl`).
 
-**Các câu lệnh mẫu**:
+**Các câu lệnh mẫu (Chạy 200 câu với 8 workers song song)**:
 
-1. **Chạy V0 (Direct Reasoning)** với 10 câu hỏi test:
+1. **Chạy V0 (Direct Reasoning)**:
    ```bash
-   python main.py --mode benchmark --config configs/v0.yaml --split test --limit 10
+   python main.py --mode benchmark --config configs/v0.yaml --split test --limit 200 --workers 8
    ```
 
 2. **Chạy V1 (RAG Evidence Retrieval)**:
    ```bash
-   python main.py --mode benchmark --config configs/v1.yaml --split test --limit 20
+   python main.py --mode benchmark --config configs/v1.yaml --split test --limit 200 --workers 8
    ```
 
-3. **Chạy V2 (Self-Correction & Verification)**:
+3. **Chạy V2-QR (Verification + Query Rewriter)**:
    ```bash
-   python main.py --mode benchmark --config configs/v2.yaml --split test --limit 20
+   python main.py --mode benchmark --config configs/v2-qr.yaml --split test --limit 200 --workers 8
    ```
 
-4. **Chạy V2-QR (Verification + Query Rewriter)**:
+4. **Chạy V3-QR (Toàn bộ Pipeline + RAG + Verifier + Query Rewriter + LTM Read-Only)**:
    ```bash
-   python main.py --mode benchmark --config configs/v2-qr.yaml --split test --limit 20
+   python main.py --mode benchmark --config configs/v3-qr.yaml --split test --limit 200 --workers 8
    ```
 
-5. **Chạy V3-QR (Toàn bộ Pipeline + RAG + Verifier + Query Rewriter + LTM Read-Only)**:
-   ```bash
-   python main.py --mode benchmark --config configs/v3-qr.yaml --split test --limit 20
-   ```
+#### ⚡ Chạy tự động toàn bộ Benchmark Suite (`run_benchmark_suite.py`)
+Để chạy liên tục các biến thể, tự động đo thời gian thực thi (wall-clock time) và xuất báo cáo so sánh chi tiết:
+```bash
+python run_benchmark_suite.py
+```
+Script sẽ tự động chạy các biến thể, gọi `evaluate.py` và tạo báo cáo `BENCHMARK_REPORT_OPTIMIZED.md`.
 
 ---
 

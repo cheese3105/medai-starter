@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from core.config import RunConfig
 from core.logger import DebugLogger, PredictionWriter, make_output_path
@@ -82,6 +84,7 @@ def run_benchmark(
     split: str = "test",
     limit: int | None = None,
     output_path: str | None = None,
+    workers: int = 8,
 ) -> dict:
     logger = DebugLogger(level=config.debug)
 
@@ -121,27 +124,74 @@ def run_benchmark(
 
     total, correct, skipped = 0, 0, 0
 
-    for i, row in enumerate(dataset):
-        episode = _row_to_episode(row, i, split)
-        if episode is None:
-            skipped += 1
-            logger.warn(f"Dòng {i} bị skip do thiếu question/options")
-            continue
-        try:
-            result = runner.run_episode(episode)
-            writer.write(result)
-            total += 1
-            if result.is_correct:
-                correct += 1
-            if not config.is_debug:
-                print(
-                    f"\r  [{total}/{len(dataset)}] acc={correct/total:.1%} "
-                    f"(last: {result.predicted_answer}={'✓' if result.is_correct else '✗'})",
-                    end="", flush=True,
-                )
-        except Exception as e:
-            logger.warn(f"Lỗi câu {episode.question_id}: {e}")
-            skipped += 1
+    if workers <= 1:
+        for i, row in enumerate(dataset):
+            episode = _row_to_episode(row, i, split)
+            if episode is None:
+                skipped += 1
+                logger.warn(f"Dòng {i} bị skip do thiếu question/options")
+                continue
+            try:
+                result = runner.run_episode(episode)
+                writer.write(result)
+                total += 1
+                if result.is_correct:
+                    correct += 1
+                if not config.is_debug:
+                    print(
+                        f"\r  [{total}/{len(dataset)}] acc={correct/total:.1%} "
+                        f"(last: {result.predicted_answer}={'✓' if result.is_correct else '✗'})",
+                        end="", flush=True,
+                    )
+            except Exception as e:
+                logger.warn(f"Lỗi câu {episode.question_id}: {e}")
+                skipped += 1
+                if "402" in str(e) or "401" in str(e):
+                    logger.warn("Dừng sớm do lỗi hạn mức tín dụng hoặc xác thực (401/402).")
+                    break
+    else:
+        logger.info(f"Chạy song song đa luồng với {workers} workers")
+        write_lock = threading.Lock()
+
+        def _process_item(item):
+            idx, row = item
+            ep = _row_to_episode(row, idx, split)
+            if ep is None:
+                return idx, None, "skipped_format"
+            try:
+                res = runner.run_episode(ep)
+                return idx, res, None
+            except Exception as err:
+                return idx, ep, err
+
+        items = list(enumerate(dataset))
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [executor.submit(_process_item, it) for it in items]
+            for fut in as_completed(futures):
+                idx, res, err = fut.result()
+                with write_lock:
+                    if err == "skipped_format":
+                        skipped += 1
+                        logger.warn(f"Dòng {idx} bị skip do thiếu question/options")
+                    elif err is not None:
+                        qid = res.question_id if hasattr(res, "question_id") else f"item_{idx}"
+                        logger.warn(f"Lỗi câu {qid}: {err}")
+                        skipped += 1
+                        if "402" in str(err) or "401" in str(err):
+                            logger.warn("Dừng sớm do lỗi hạn mức tín dụng hoặc xác thực (401/402).")
+                            executor.shutdown(wait=False, cancel_futures=True)
+                            break
+                    else:
+                        writer.write(res)
+                        total += 1
+                        if res.is_correct:
+                            correct += 1
+                        if not config.is_debug:
+                            print(
+                                f"\r  [{total}/{len(dataset)}] acc={correct/total:.1%} "
+                                f"(last: {res.predicted_answer}={'✓' if res.is_correct else '✗'})",
+                                end="", flush=True,
+                            )
 
     if not config.is_debug:
         print()
