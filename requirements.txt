@@ -5,3 +5,4 @@ datasets>=2.14.0
 chromadb>=0.4.0
 scipy>=1.10.0
 numpy>=1.22.5
+matplotlib>=3.8.0

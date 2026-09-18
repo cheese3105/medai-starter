@@ -7,27 +7,7 @@
   --injected-limit 100 \
   --sample-size 100 \
   --seed 42 \
-  --output-dir attack/output/v0-deepseek
-
-  .venv/bin/python -m attack.cli \
-  --target-config attack/configs/v0-attack.yaml \
-  --attacks combined \
-  --tasks sentiment \
-  --target-limit 10 \
-  --injected-limit 10 \
-  --sample-size 10 \
-  --seed 42 \
-  --output-dir attack/output/v0-deepseek
-
-    .venv/bin/python -m attack.cli \
-  --target-config attack/configs/v1-qr-attack.yaml \
-  --attacks combined \
-  --tasks sentiment \
-  --target-limit 10 \
-  --injected-limit 10 \
-  --sample-size 10 \
-  --seed 42 \
-  --output-dir attack/output/v1-deepseek
+  --output-dir attack/output/v0
 
 .venv/bin/python -m attack.cli \
   --target-config attack/configs/v1-qr-attack.yaml \
