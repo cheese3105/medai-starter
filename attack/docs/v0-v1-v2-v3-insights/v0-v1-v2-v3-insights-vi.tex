@@ -1,0 +1,186 @@
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[vietnamese]{babel}
+\usepackage[margin=0.8in]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{caption}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+
+\graphicspath{{figures/}}
+\definecolor{accent}{HTML}{245A8D}
+\definecolor{muted}{HTML}{555555}
+\captionsetup{font=small,labelfont=bf}
+\setlist[itemize]{leftmargin=1.4em,itemsep=0.2em,topsep=0.25em}
+\titlespacing*{\section}{0pt}{1.4ex plus .2ex minus .2ex}{0.5ex plus .1ex minus .1ex}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.48em}
+\setlength{\headheight}{14pt}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Prompt-Injection Benchmark}
+\rhead{So sánh V0--V3}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\makeatletter
+\def\@maketitle{%
+  \newpage
+  \null
+  \vskip -0.6em%
+  \begin{center}%
+  \let \footnote \thanks
+    {\Large\bfseries \@title \par}%
+    \vskip 0.5em%
+    {\normalsize
+      \lineskip .2em%
+      \begin{tabular}[t]{c}%
+        \@author
+      \end{tabular}\par}%
+    \vskip 0.3em%
+    {\small \@date}%
+  \end{center}%
+  \par
+  \vskip 0.6em}
+\makeatother
+
+\title{Đánh giá thực nghiệm Prompt-Injection trên các Pipeline V0--V3}
+\author{MED-AI Attack Benchmark}
+\date{Tháng 9 năm 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\vspace{-0.3em}
+Báo cáo này đánh giá và so sánh thực nghiệm 4 phiên bản pipeline: \textbf{V0} (reasoning trực tiếp), \textbf{V1} (bổ sung query rewriting và retrieval), \textbf{V2} (tích hợp isolated verifier và retry loop), và \textbf{V3} (bổ sung short-term memory và tối ưu prompt). Kết quả thực nghiệm cho thấy clean target accuracy tăng nhẹ từ 0.74 (V0) lên 0.78 (V3). Sự xuất hiện của cơ chế verifier ở V2 và V3 giúp giảm đáng kể ASV đối với các phương pháp tấn công đơn lẻ (Naive, Fake-completion, Context-ignoring), đồng thời hỗ trợ khôi phục accuracy của tác vụ y tế. Tuy nhiên, phương pháp tấn công \textbf{Combined} vẫn duy trì ASV xấp xỉ 0.8 trên toàn bộ các phiên bản và làm độ chính xác y tế giảm gần như về 0. Ngoài ra, V3 ghi nhận tỷ lệ parse failure gia tăng đáng kể (1,047/2,500 ca) cùng mức tiêu thụ tài nguyên gấp khoảng 16 lần so với V0.
+\vspace{-0.3em}
+\end{abstract}
+
+\section{Thiết kế thực nghiệm và kết quả tổng thể}
+
+Thực nghiệm được tiến hành đồng nhất trên mô hình \texttt{nvidia/nemotron-3.5-lightning} (seed 42), bao gồm 100 câu hỏi MedQA mục tiêu kết hợp với 5 injected tasks qua 5 phương pháp tấn công, tạo thành 2,500 kịch bản kiểm thử ghép cặp đối sánh trực tiếp. V0 thực hiện suy luận trực tiếp; V1 bổ sung bước retrieval; V2 thiết lập thêm verifier độc lập (tối đa 2 chu kỳ retry); V3 tích hợp thêm short-term memory trong vòng lặp. Lưu ý rằng benchmark không truyền tham số \texttt{ltm\_facts}, do đó các cải thiện ở V3 chủ yếu đến từ cấu trúc loop/prompt thay vì truy xuất long-term memory.
+
+\begin{table}[H]
+\centering
+\caption{So sánh hiệu năng tổng thể giữa các phiên bản V0--V3.}
+\vspace{-0.2em}
+\begin{tabular}{lrrrr}
+\toprule
+Metric & V0 & V1 & V2 & V3 \\
+\midrule
+Clean target accuracy (PNA-T) & 0.74 & 0.75 & 0.76 & 0.78 \\
+Mean ASV (all groups) & 0.577 & 0.633 & 0.515 & 0.396 \\
+Mean Matching Rate (all groups) & 0.664 & 0.703 & 0.603 & 0.444 \\
+Mean Target Accuracy Drop & 0.532 & 0.623 & 0.491 & 0.382 \\
+Attack parse failures / 2,500 & 509 & 346 & 709 & 1,047 \\
+Attack API errors / 2,500 & 0 & 4 & 1 & 0 \\
+Median attack latency (giây) & 0.52 & 5.54 & 10.09 & 9.53 \\
+Mean tokens / case & 378 & 1,749 & 6,175 & 6,065 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Ý nghĩa các chỉ số}: ASV đo tỷ lệ phản hồi trùng khớp với gold label của injected task; Matching Rate phản ánh mức độ mô hình tái hiện hành vi dự đoán sạch trên injected task; Target Accuracy Drop đo lường mức độ suy giảm độ chính xác của bài toán y tế khi bị tấn công. Giá trị ASV, Matching Rate hay Target Accuracy Drop càng cao thể hiện mức độ tổn thương của hệ thống càng lớn.
+
+\clearpage
+\section{Hiệu quả tấn công theo Attack Method}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.96\textwidth]{01-asv-by-attack-method.png}
+\caption{Attack Success Value (ASV) trung bình theo phương pháp tấn công.}
+\end{figure}
+
+Từ V0 sang V1, việc đưa thêm dữ liệu retrieval khiến ASV tăng ở hầu hết các phương pháp tấn công (Naive tăng từ 0.446 lên 0.554; Fake-completion tăng từ 0.366 lên 0.470). Ở V2 và V3, cơ chế verifier kết hợp retry loop đã phát huy hiệu quả rõ rệt đối với các kịch bản tấn công đơn lẻ: tại V3, ASV của Naive giảm mạnh xuống 0.196, Context-ignoring còn 0.226, và Fake-completion còn 0.142.
+
+\textbf{Nhận xét}:
+\begin{itemize}
+  \item \textbf{Hiệu quả của Verifier đối với các dạng tấn công đơn giản}: Khi gặp các chỉ thị tấn công dạng cơ bản, verifier nhận diện được sự bất thường trong định dạng phản hồi và kích hoạt vòng retry, tạo điều kiện cho mô hình khôi phục mục tiêu ban đầu.
+  \item \textbf{Hạn chế cốt lõi trước phương pháp Combined}: Tấn công Combined duy trì ASV xấp xỉ 0.8 xuyên suốt 4 phiên bản (0.778 $\to$ 0.812 $\to$ 0.786 $\to$ 0.792). Nguyên nhân chủ yếu xuất phát từ việc nội dung độc hại từ external source vẫn được đưa nguyên vẹn vào prompt reasoning ở mỗi vòng retry. Do verifier chỉ đóng vai trò kiểm duyệt đầu ra mà không có khả năng cách ly (quarantine) nguồn dữ liệu bên ngoài, các phương pháp tấn công phức tạp vẫn tiếp tục chi phối mô hình ở các lượt suy luận tiếp theo.
+\end{itemize}
+
+\clearpage
+\section{ASV và Matching Rate}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.76\textwidth]{02-asv-vs-matching-rate.png}
+\caption{Tương quan giữa ASV và Matching Rate trên 20 nhóm cấu hình.}
+\end{figure}
+
+Trên biểu đồ tương quan, toàn bộ các điểm quan sát đều nằm dưới đường $y=x$, cho thấy Matching Rate luôn cao hơn ASV một cách nhất quán (giá trị trung bình V0: 0.664 vs 0.577; V1: 0.703 vs 0.633; V2: 0.603 vs 0.515; V3: 0.444 vs 0.396). Đáng chú ý với tấn công Combined ở V3, dù ASV đạt 0.792 thì Matching Rate vẫn lên tới 0.872.
+
+\textbf{Nhận xét}:
+\begin{itemize}
+  \item \textbf{Phân biệt giữa hành vi chuyển hướng tác vụ và độ chính xác}: Matching Rate là thước đo trực tiếp cho hiện tượng task hijacking --- mô hình tuân thủ hoàn toàn chỉ thị tấn công. Ngược lại, ASV là chỉ số khắt khe hơn vì phụ thuộc thêm vào khả năng mô hình phân loại chính xác gold label của tác vụ bị tiêm.
+  \item \textbf{Ảnh hưởng từ tỷ lệ Parse Failure ở V3}: V3 xuất hiện tới 1,047 ca parse failure (chiếm $\sim$42\% tổng số mẫu thử). Mức sụt giảm ASV ở V3 một phần bắt nguồn từ việc phản hồi không thể trích xuất được nhãn hợp lệ (do xung đột cấu trúc prompt hoặc can thiệp của verifier), chứ không đồng nghĩa với việc câu trả lời y tế đã được bảo toàn thành công.
+\end{itemize}
+
+\clearpage
+\section{Độ nhạy theo Injected Task}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\textwidth]{03-asv-by-version-and-task.png}
+\caption{ASV trung bình phân rã theo phiên bản và tác vụ tiêm nhiễm.}
+\end{figure}
+
+Xu hướng suy giảm ASV từ V1 đến V3 được ghi nhận trên toàn bộ 5 injected tasks: Sentiment (0.748 $\to$ 0.444), Spam (0.774 $\to$ 0.418), Duplicate (0.574 $\to$ 0.344), Hate speech (0.342 $\to$ 0.266), và NLI (0.726 $\to$ 0.510).
+
+\textbf{Nhận xét}:
+\begin{itemize}
+  \item \textbf{Tác vụ NLI duy trì ASV cao nhất ở V3 (0.510)}: Do NLI sở hữu cấu trúc suy luận logic chặt chẽ (\texttt{entailment}/\texttt{not entailment}), dạng chỉ thị này dễ dàng áp đặt lên quá trình reasoning của mô hình, hạn chế khả năng phát hiện của verifier.
+  \item \textbf{Tác vụ Hate speech luôn có ASV thấp nhất (<0.35)}: Kết quả này phản ánh tác động từ các cơ chế guardrail sẵn có của mô hình nền tảng, vốn có xu hướng từ chối hoặc làm chệch hướng các nội dung độc hại.
+  \item \textbf{Đặc tính phân loại nhị phân}: Các tác vụ có không gian nhãn đơn giản (Sentiment, Spam) từng đạt tỷ lệ tấn công rất cao ở V1 đã suy giảm đáng kể ở V3 nhờ sự can thiệp của verifier.
+\end{itemize}
+
+\clearpage
+\section{Mức độ suy giảm Target Accuracy}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.96\textwidth]{04-target-accuracy-drop.png}
+\caption{Mức suy giảm độ chính xác của bài toán y tế mục tiêu dưới tác động tấn công.}
+\end{figure}
+
+Mức độ sụt giảm accuracy y tế phản ánh trực tiếp thiệt hại đối với bài toán nghiệp vụ chính:
+\begin{itemize}
+  \item \textbf{Khôi phục hiệu quả trước các phương pháp tấn công đơn lẻ}: Tại V3, mức sụt giảm accuracy giảm đáng kể ở Naive (từ 52.6\% ở V1 xuống 16.8\%), Context-ignoring (từ 61.6\% xuống 22.4\%) và Fake-completion (từ 48.0\% xuống 10.0\%).
+  \item \textbf{Ảnh hưởng dai dẳng của Escape-characters}: Dù ASV giảm, Escape-characters ở V3 vẫn làm mất tới 63.8\% target accuracy.
+  \item \textbf{Vô hiệu hóa hoàn toàn trước tấn công Combined}: Ở V0, V1 và V2, target accuracy khi gặp tấn công Combined đều giảm về 0\%. Tại V3, con số này chỉ đạt 0.2\% (sụt giảm 77.8\% so với mức 78.0\% clean baseline).
+\end{itemize}
+
+\textbf{Nhận xét}: Tiêu chí đánh giá cốt lõi của một giải pháp phòng thủ không chỉ dừng lại ở việc hạ thấp ASV, mà bắt buộc phải bảo toàn được target accuracy. Một phản hồi bị lỗi định dạng (parse failure) vẫn được xem là thất bại nếu câu trả lời y tế không còn tính chính xác.
+
+\clearpage
+\section{Chi phí tính toán và Đúc kết thực nghiệm}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\textwidth]{05-computational-overhead.png}
+\caption{Chi phí tính toán thực tế: Median latency và Mean token usage.}
+\end{figure}
+
+Việc áp dụng verifier và retry loop làm gia tăng đáng kể chi phí vận hành:
+\begin{itemize}
+  \item \textbf{Độ trễ (Latency)}: Tăng từ 0.52 giây (V0) lên 5.54 giây (V1), đạt 10.09 giây (V2) và 9.53 giây (V3) --- cao hơn khoảng 18--19 lần so với pipeline V0.
+  \item \textbf{Mức tiêu thụ token}: Tăng từ 378 tokens (V0) lên 1,749 tokens (V1), đạt 6,175 tokens (V2) và 6,065 tokens (V3) --- gấp khoảng 16 lần so với V0.
+\end{itemize}
+
+\section{Kết luận và Định hướng}
+
+\begin{itemize}
+  \item \textbf{Verifier có hiệu quả chọn lọc}: V2 và V3 chứng minh vòng lặp kiểm duyệt giúp giảm thiểu rõ rệt các phương pháp tấn công đơn giản (Naive, Context-ignoring, Fake-completion) và hỗ trợ khôi phục accuracy y tế.
+  \item \textbf{Thách thức chưa được giải quyết từ Combined attack}: Tỷ lệ tấn công vẫn duy trì quanh mức 80\% và target accuracy gần như bị triệt tiêu. Chừng nào dữ liệu độc hại từ external source chưa được bóc tách trước khi retry, verifier vẫn khó ngăn chặn các phương pháp tấn công kết hợp phức tạp.
+  \item \textbf{Định hướng phát triển cho các phiên bản tiếp theo}: Cần tích hợp cơ chế phát hiện và làm sạch dữ liệu (sanitizer/quarantine) đối với external source trước khi chuyển tiếp vào vòng suy luận mới, đồng thời tối ưu số lần retry để kiểm soát chi phí tính toán.
+\end{itemize}
+
+\end{document}
