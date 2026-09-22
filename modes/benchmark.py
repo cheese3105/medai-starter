@@ -17,7 +17,7 @@ OUTPUT_DIR = "output"
 
 def _load_dataset(split: str, limit: int | None = None):
     from datasets import load_dataset
-    ds = load_dataset("GBaker/MedQA-USMLE-4-options", split=split)
+    ds = load_dataset("data/MedQA-USMLE-4-options", split=split)
     if limit is not None and limit > 0:
         ds = ds.select(range(min(limit, len(ds))))
     return ds

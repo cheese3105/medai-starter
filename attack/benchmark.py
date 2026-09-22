@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from attack.attacks import ATTACKS, AttackBuilder
+from attack.defenses import DEFENSES, apply_defense
 from attack.metrics import calculate_metrics
 from attack.sampling import sample_pairs
 from attack.tasks import InjectedExample, InjectedTask, load_tasks
@@ -76,11 +77,14 @@ def _error_message(exc: Exception) -> str:
 def run_attack_benchmark(
     *, target_config: str, attack_names: list[str], task_names: list[str],
     split: str, target_limit: int, injected_limit: int, sample_size: int,
-    seed: int, output_dir: str,
+    seed: int, output_dir: str, defense: str = "none",
 ) -> dict[str, Any]:
     unknown_attacks = sorted(set(attack_names) - ATTACKS.keys())
     if unknown_attacks:
         raise ValueError(f"Unknown attacks: {', '.join(unknown_attacks)}")
+    if defense not in DEFENSES:
+        available = ", ".join(DEFENSES.keys())
+        raise ValueError(f"Unknown defense '{defense}'. Available: {available}")
     if target_limit < 1 or injected_limit < 1:
         raise ValueError("target_limit and injected_limit must be at least 1")
 
@@ -117,6 +121,7 @@ def run_attack_benchmark(
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "target_config": target_config, "variant": config.variant, "model": config.model,
         "enable_reasoning": False,
+        "defense_strategy": defense,
         "target_dataset": "GBaker/MedQA-USMLE-4-options", "split": split,
         "target_limit": target_limit, "injected_limit": injected_limit,
         "sample_size_per_task": sample_size, "seed": seed, "attacks": attack_names,
@@ -184,6 +189,8 @@ def run_attack_benchmark(
             for target, injected in pairs:
                 compromised_source = attack_builder(CLEAN_EXTERNAL_SOURCE, task.instruction,
                                                     injected.text)
+                # Apply defense to compromised source
+                defended_source = apply_defense(compromised_source, defense)
                 error, attacked_target_prediction = None, None
                 attacked_label, raw_response = None, ""
                 latency_ms, token_usage = None, {}
@@ -191,7 +198,7 @@ def run_attack_benchmark(
                 try:
                     attacked = runner.run_episode(EpisodeInput(
                         target.question_id, target.question, target.choices,
-                        target.gold_answer, compromised_source))
+                        target.gold_answer, defended_source))
                     attacked_target_prediction = attacked.predicted_answer
                     raw_response = attacked.reasoning_raw_response or ""
                     attacked_label = task.parse_label(raw_response)
@@ -205,8 +212,10 @@ def run_attack_benchmark(
                 row = {
                     "target_id": target.question_id, "injected_task": task.name,
                     "injected_example_id": injected.id, "attack_method": attack_name,
+                    "defense_strategy": defense,
                     "clean_external_source": CLEAN_EXTERNAL_SOURCE,
                     "compromised_external_source": compromised_source,
+                    "defended_external_source": defended_source if defense != "none" else None,
                     "target_gold": target.gold_answer,
                     "clean_target_prediction": clean_target_predictions[target.question_id],
                     "attacked_target_prediction": attacked_target_prediction,

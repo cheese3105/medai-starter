@@ -8,6 +8,7 @@ import sys
 
 from attack.attacks import ATTACKS
 from attack.benchmark import run_attack_benchmark
+from attack.defenses import DEFENSES
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -18,6 +19,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--tasks", nargs="+",
         choices=["sentiment", "spam", "duplicate", "hate", "nli"],
         default=["sentiment", "spam", "duplicate", "hate", "nli"],
+    )
+    parser.add_argument(
+        "--defense", default="none", choices=sorted(DEFENSES),
+        help="Defense strategy to apply (default: none)",
     )
     parser.add_argument("--split", default="test")
     parser.add_argument("--target-limit", type=int, default=8)
@@ -41,6 +46,7 @@ def main() -> None:
             sample_size=args.sample_size,
             seed=args.seed,
             output_dir=args.output_dir,
+            defense=args.defense,
         )
     except Exception as exc:
         print(f"Attack benchmark failed: {exc}", file=sys.stderr)

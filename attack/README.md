@@ -1,7 +1,9 @@
 # MED-AI prompt injection benchmark
 
-This directory contains the small attack-only benchmark described in
+This directory contains the attack benchmark and defense system described in
 [`docs/implementation-detail.md`](docs/implementation-detail.md).
+
+**For defense strategies and usage, see [`DEFENSE_README.md`](DEFENSE_README.md).**
 
 The benchmark provides:
 
@@ -15,19 +17,38 @@ The benchmark provides:
 - attack configurations for V0, V1-QR, V2-QR, and V3-QR, with a
   reasoning-only `external_source`.
 
-Run the V0 smoke benchmark:
+Run the V0 smoke benchmark without defense:
 
 ```bash
 .venv/bin/python -m attack.cli \
   --target-config attack/configs/v0-attack.yaml \
   --attacks naive escape_characters context_ignoring fake_completion combined \
   --tasks sentiment spam duplicate hate nli \
+  --defense none \
   --target-limit 8 \
   --injected-limit 8 \
   --sample-size 8 \
   --seed 42 \
   --output-dir attack/output/smoke-v0
 ```
+
+Run with defense (StruQ XML):
+
+```bash
+.venv/bin/python -m attack.cli \
+  --target-config attack/configs/v0-attack.yaml \
+  --attacks combined \
+  --tasks sentiment spam duplicate hate nli \
+  --defense struq_xml \
+  --target-limit 8 \
+  --injected-limit 8 \
+  --sample-size 8 \
+  --seed 42 \
+  --output-dir attack/output/defended-struq-xml
+```
+
+Available defenses: `none`, `struq_xml`, `struq_json`, `delimiter`, `instruction_hardening`, 
+`sanitization`, `sandwich`, `combined`. See [`DEFENSE_README.md`](DEFENSE_README.md) for details.
 
 This makes live model calls. Hugging Face `datasets` downloads the datasets on
 the first run and reuses its local cache on later runs. Sentiment uses
